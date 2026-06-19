@@ -4,45 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DOSSIER — Murder Mystery Companion</title>
+<link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; overflow: hidden; }
-  body { background: #080808; color: #F0EEF0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 0; }
-  select option { background: #141414; color: #F0EEF0; }
-  input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
-  input::placeholder { color: #3A3A3A; }
-  textarea::placeholder { color: #3A3A3A; }
-  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.85} 94%{opacity:1} 97%{opacity:.9} 98%{opacity:1} }
-</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
-// ═══ TOKENS ═══
-const C = {
-  bg:'#080808', surface:'#0E0E0E', surfaceRaised:'#161616',
-  border:'#242424', borderBright:'#383838',
-  red:'#CC0000', redBright:'#FF2222', redDim:'#280000',
-  white:'#F0EEF0', whiteDim:'#A0A0A0', whiteMuted:'#484848',
-  text:'#F5F4F6', textDim:'#A8A4AC', textMuted:'#6A6670',
-  green:'#2EA85A', greenDim:'#0A2416',
-  amber:'#B87820', amberDim:'#302008',
-  blue:'#3A6A9A', blueDim:'#0A1828',
-};
-
+// ═══ EFFECT TYPE → CSS class / accent color ═══
 const EFF = {
-  buff:       {bg:'#0A2416',text:'#60D090',border:'#2EA85A'},
-  debuff:     {bg:'#280000',text:'#FF7070',border:'#CC0000'},
-  punishment: {bg:'#1A0000',text:'#FF3030',border:'#880000'},
-  perk:       {bg:'#0A1828',text:'#7090C0',border:'#3A6A9A'},
+  buff:       {cls:'tag--buff',       accent:'#2EA85A', bg:'#0A2416', text:'#60D090'},
+  debuff:     {cls:'tag--debuff',     accent:'#CC0000', bg:'#280000', text:'#FF7070'},
+  punishment: {cls:'tag--punishment', accent:'#880000', bg:'#1A0000', text:'#FF3030'},
+  perk:       {cls:'tag--perk',       accent:'#3A6A9A', bg:'#0A1828', text:'#7090C0'},
 };
 const effKey = t => t==='punição'?'punishment':t;
 
@@ -52,16 +29,12 @@ const teamColor = (name='') => {
   let h=0; for(const c of name) h=c.charCodeAt(0)+((h<<5)-h);
   return `hsl(${Math.abs(h)%360},50%,25%)`;
 };
-// Lighter variant used for text on dark backgrounds (legibility)
 const teamColorText = (name='') => {
   const map={Mastermind:'#FF7070',Despair:'#FF5050',Student:'#C8C4D0',Aluno:'#C8C4D0'};
   if(map[name]) return map[name];
   let h=0; for(const c of name) h=c.charCodeAt(0)+((h<<5)-h);
   return `hsl(${Math.abs(h)%360},65%,68%)`;
 };
-const font='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-const MONO_FONT='"Courier New", Courier, monospace';
-const R=3; // border-radius base
 
 // ═══ STORAGE ═══
 const db={
@@ -99,79 +72,54 @@ function useTimers(){
   return{ts,start,pause,resume,reset,rem,fmtMs};
 }
 
-// ═══ MONOKUMA SVG ═══
-function MonokumaIcon({size=64}){
-  const s=size;const h=s/2;
-  return(
-    <svg width={s} height={s} viewBox="0 0 80 80" style={{display:'block',margin:'0 auto',filter:'drop-shadow(0 0 8px #CC000066)'}}>
-      <defs>
-        <clipPath id="mk-l"><rect x="0" y="0" width="40" height="80"/></clipPath>
-        <clipPath id="mk-r"><rect x="40" y="0" width="40" height="80"/></clipPath>
-      </defs>
-      {/* Ears */}
-      <circle cx="16" cy="13" r="11" fill="#F0EEF0"/>
-      <circle cx="64" cy="13" r="11" fill="#141414"/>
-      <circle cx="16" cy="13" r="6" fill="#D8D0D8"/>
-      <circle cx="64" cy="13" r="6" fill="#282828"/>
-      {/* Head */}
-      <circle cx="40" cy="38" r="28" fill="#F0EEF0" clipPath="url(#mk-l)"/>
-      <circle cx="40" cy="38" r="28" fill="#141414" clipPath="url(#mk-r)"/>
-      {/* Split line */}
-      <line x1="40" y1="10" x2="40" y2="66" stroke="#CC0000" strokeWidth="1.5" opacity="0.8"/>
-      {/* Left eye (dark/black on white face) */}
-      <ellipse cx="26" cy="33" rx="6" ry="7" fill="#1A1A1A"/>
-      <ellipse cx="24" cy="31" rx="2" ry="2" fill="#666" opacity="0.6"/>
-      {/* Right eye (Monokuma red, angular) */}
-      <polygon points="46,27 54,27 56,39 52,41 44,39 42,29" fill="#CC0000"/>
-      <polygon points="47,29 53,29 54,37 48,37" fill="#FF2222" opacity="0.7"/>
-      <ellipse cx="50" cy="33" rx="2" ry="2.5" fill="#FF5555" opacity="0.9"/>
-      {/* Nose */}
-      <ellipse cx="40" cy="46" rx="4" ry="2.5" fill="#D0C8D0" clipPath="url(#mk-l)"/>
-      <ellipse cx="40" cy="46" rx="4" ry="2.5" fill="#2A2A2A" clipPath="url(#mk-r)"/>
-      {/* Grin */}
-      <path d="M25 52 Q40 62 55 52" stroke="#555" strokeWidth="1.5" fill="none" strokeLinecap="round" clipPath="url(#mk-l)"/>
-      <path d="M25 52 Q40 62 55 52" stroke="#CC0000" strokeWidth="1.5" fill="none" strokeLinecap="round" clipPath="url(#mk-r)"/>
-    </svg>
-  );
+// ═══ LOGO IMAGE ═══
+// Swap this path to your own image. Falls back to a text mark if missing.
+const LOGO_SRC = 'assets/monokuma.png';
+function LogoImage({size}){
+  const[err,setErr]=useState(false);
+  if(err) return <div className="mono" style={{fontSize:size?40:28,fontWeight:900,color:'var(--red)',textAlign:'center'}}>⚈⚆</div>;
+  return <img src={LOGO_SRC} alt="" className="home__logo-img" onError={()=>setErr(true)}/>;
 }
 
 // ═══ PRIMITIVES ═══
-function Btn({children,onClick,variant='default',small,disabled,style}){
-  const v={
-    default:{bg:C.surfaceRaised,color:C.text,bdr:C.border},
-    primary:{bg:C.red,color:'#fff',bdr:'transparent'},
-    danger:{bg:'#660000',color:'#fff',bdr:'transparent'},
-    ghost:{bg:'transparent',color:C.textDim,bdr:C.border},
-    success:{bg:'#1A5A30',color:'#60D090',bdr:'#2EA85A'},
-    white:{bg:C.white,color:'#080808',bdr:'transparent'},
-  }[variant]||{bg:C.surfaceRaised,color:C.text,bdr:C.border};
-  return<button onClick={onClick} disabled={disabled} style={{background:v.bg,color:v.color,border:`1px solid ${v.bdr}`,padding:small?'4px 10px':'8px 16px',borderRadius:R,fontSize:small?11:13,fontFamily:font,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,whiteSpace:'nowrap',flexShrink:0,letterSpacing:'0.02em',...style}}>{children}</button>;
+function Btn({children,onClick,variant='default',small,disabled,full,className='',style}){
+  return(
+    <button onClick={onClick} disabled={disabled}
+      className={`btn btn--${variant} ${small?'btn--small':''} ${full?'btn--full':''} ${className}`}
+      style={style}>
+      {children}
+    </button>
+  );
 }
-function Inp({value,onChange,placeholder,type='text',min,max,style,onKeyDown,disabled}){
-  return<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} min={min} max={max} onKeyDown={onKeyDown} disabled={disabled} style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,color:C.text,borderRadius:R,padding:'8px 12px',fontSize:13,fontFamily:font,outline:'none',width:'100%',boxSizing:'border-box',opacity:disabled?0.35:1,...style}}/>;
+function Inp({value,onChange,placeholder,type='text',min,max,style,onKeyDown,disabled,className=''}){
+  return<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} min={min} max={max} onKeyDown={onKeyDown} disabled={disabled} className={`input ${className}`} style={style}/>;
 }
-function SelEl({value,onChange,options,style}){
-  return<select value={value} onChange={e=>onChange(e.target.value)} style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,color:C.text,borderRadius:R,padding:'8px 12px',fontSize:13,fontFamily:font,outline:'none',width:'100%',...style}}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select>;
+function SelEl({value,onChange,options,style,className=''}){
+  return<select value={value} onChange={e=>onChange(e.target.value)} className={`select ${className}`} style={style}>{options.map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}</select>;
 }
-const Lbl=({children,style})=><div style={{fontSize:10,fontWeight:700,color:C.textDim,textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:6,...style}}>{children}</div>;
-const Fld=({label,children,style})=><div style={{marginBottom:14,...style}}>{label&&<Lbl>{label}</Lbl>}{children}</div>;
-const Hr=()=><div style={{height:1,background:C.border,margin:'12px 0'}}/>;
+const Lbl=({children,style,className=''})=><div className={`label ${className}`} style={style}>{children}</div>;
+const Fld=({label,children,style})=><div className="field" style={style}>{label&&<Lbl>{label}</Lbl>}{children}</div>;
+const Hr=()=><div className="hr"/>;
 function Modal({title,onClose,children,wide}){
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:12}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:C.surface,border:`1px solid ${C.borderBright}`,borderTop:`2px solid ${C.red}`,borderRadius:R,width:'100%',maxWidth:wide?620:420,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-          <div style={{fontSize:13,fontWeight:700,color:C.text,letterSpacing:'0.06em',textTransform:'uppercase'}}>{title}</div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:16,lineHeight:1,padding:4}}>✕</button>
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className={`modal ${wide?'modal--wide':''}`}>
+        <div className="modal__header">
+          <div className="modal__title">{title}</div>
+          <button onClick={onClose} className="modal__close">✕</button>
         </div>
-        <div style={{padding:16,overflow:'auto',flex:1}}>{children}</div>
+        <div className="modal__body">{children}</div>
       </div>
     </div>
   );
 }
 function Tag({children,type='buff'}){
-  const col=EFF[effKey(type)]||EFF.buff;
-  return<span style={{background:col.bg,color:col.text,border:`1px solid ${col.border}`,borderRadius:2,fontSize:9,padding:'2px 5px',fontWeight:700,display:'inline-flex',alignItems:'center',letterSpacing:'0.05em',textTransform:'uppercase'}}>{children}</span>;
+  const e=EFF[effKey(type)]||EFF.buff;
+  return<span className={`tag ${e.cls}`}>{children}</span>;
+}
+function Pill({active,activeMuted,onClick,children}){
+  const cls = active ? 'pill pill--active' : activeMuted ? 'pill pill--active-muted' : 'pill';
+  return<button onClick={onClick} className={cls}>{children}</button>;
 }
 
 // ═══ TIMER WIDGET ═══
@@ -179,12 +127,15 @@ function TimerWidget({id,label,durMin,T}){
   const{ts,start,pause,resume,reset,rem,fmtMs}=T;
   const t=ts[id];const r=rem(id);const running=t?.running;const expired=r===0;const durMs=durMin*60000;
   const progress=t?Math.max(0,1-t.elapsed/t.durationMs):1;
+  const borderColor = expired?'var(--red)':running?'var(--red-dim)':'var(--border)';
+  const borderTopColor = expired?'var(--red)':running?'rgba(204,0,0,0.4)':'var(--border)';
+  const valueColor = expired?'var(--red)':running?'var(--text)':'var(--text-dim)';
   return(
-    <div style={{background:C.surfaceRaised,border:`1px solid ${expired?C.red:running?C.redDim:C.border}`,borderTop:`2px solid ${expired?C.red:running?C.red+'66':C.border}`,borderRadius:R,padding:'7px 10px',display:'flex',flexDirection:'column',gap:4,minWidth:88,flex:1}}>
-      <div style={{fontSize:8,color:C.textDim,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700}}>{label}</div>
-      <div style={{fontFamily:MONO_FONT,fontSize:22,lineHeight:1,color:expired?C.red:running?C.white:C.textDim,fontVariantNumeric:'tabular-nums',fontWeight:running?700:400}}>{fmtMs(r)??`${durMin}:00`}</div>
-      {t&&<div style={{height:2,background:C.border}}><div style={{height:'100%',width:`${progress*100}%`,background:expired?C.red:C.red,transition:'width 0.3s linear'}}/></div>}
-      <div style={{display:'flex',gap:4}}>
+    <div className="timer" style={{'--timer-border':borderColor,'--timer-border-top':borderTopColor}}>
+      <div className="timer__label">{label}</div>
+      <div className="timer__value" style={{'--timer-value-color':valueColor,'--timer-value-weight':running?700:400}}>{fmtMs(r)??`${durMin}:00`}</div>
+      {t&&<div className="timer__progress"><div className="timer__progress-fill" style={{'--progress':`${progress*100}%`}}/></div>}
+      <div className="timer__actions">
         {!t&&<Btn small onClick={()=>start(id,durMs)}>▶</Btn>}
         {t&&running&&<Btn small variant="ghost" onClick={()=>pause(id)}>⏸</Btn>}
         {t&&!running&&r>0&&<Btn small onClick={()=>resume(id)}>▶</Btn>}
@@ -196,22 +147,22 @@ function TimerWidget({id,label,durMin,T}){
 
 // ═══ PLAYER CARD ═══
 function PlayerCard({player,currentCycle,onClick}){
-  const tc=teamColor(player.team);const alive=player.alive;
+  const tc=teamColor(player.team);const tcText=teamColorText(player.team);const alive=player.alive;
   const effects=player.effects.filter(e=>!e.manuallyExpired);
   const voteWeight=player.voteWeight||1;
   return(
-    <div onClick={onClick} style={{background:alive?C.surface:'#140000',border:`1px solid ${alive?C.border:C.red}`,borderLeft:`4px solid ${alive?tc:C.red}`,borderRadius:R,padding:'10px 11px',cursor:'pointer',opacity:alive?1:0.85,userSelect:'none',position:'relative'}}>
-      <div style={{position:'absolute',top:9,right:9,width:7,height:7,borderRadius:'50%',background:alive?C.green:C.red,boxShadow:alive?`0 0 5px ${C.green}88`:`0 0 5px ${C.red}`}}/>
-      <div style={{fontSize:14,fontWeight:800,color:alive?C.text:'#D8A0A0',textDecoration:alive?'none':'line-through',textDecorationColor:C.red,textDecorationThickness:'2px',paddingRight:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'0.01em'}}>{player.name}</div>
-      <div style={{fontSize:11,color:alive?teamColorText(player.team):'#C06060',fontWeight:800,marginTop:3,textTransform:'uppercase',letterSpacing:'0.07em'}}>{player.team}</div>
+    <div onClick={onClick} className={`player-card ${alive?'':'player-card--dead'}`} style={{'--accent':alive?tc:undefined}}>
+      <div className="player-card__dot" style={{'--dot-color':alive?'var(--green)':'var(--red)','--dot-glow':alive?'rgba(46,168,90,0.5)':'rgba(204,0,0,0.6)'}}/>
+      <div className="player-card__name">{player.name}</div>
+      <div className="player-card__team" style={{'--team-text':alive?tcText:undefined}}>{player.team}</div>
       {player.role&&(
-        <div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}>
-          <div style={{fontSize:11,color:alive?C.textDim:C.textMuted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{player.role}</div>
-          <div style={{fontSize:9,color:alive?C.red:C.textMuted,fontWeight:800,flexShrink:0,letterSpacing:'0.02em'}}>🗳{voteWeight}</div>
+        <div className="player-card__role-row">
+          <div className="player-card__role">{player.role}</div>
+          <div className="player-card__votes">🗳{voteWeight}</div>
         </div>
       )}
       {effects.length>0&&(
-        <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:6}}>
+        <div className="player-card__effects">
           {effects.map(e=>{const rem=remIG(e,currentCycle);const label=e.name.length>7?e.name.slice(0,6)+'…':e.name;const suffix=e.permanent?' ∞':(rem!==null?` ${rem}h`:'');return<Tag key={e.id} type={e.type}>{label}{suffix}</Tag>;})}
         </div>
       )}
@@ -222,46 +173,32 @@ function PlayerCard({player,currentCycle,onClick}){
 // ═══ HOME SCREEN ═══
 function HomeScreen({session,onNew,onContinue,onClear}){
   return(
-    <div style={{height:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,fontFamily:font,position:'relative',overflow:'hidden'}}>
-      {/* Background diagonal lines */}
-      <div style={{position:'absolute',inset:0,opacity:0.03,backgroundImage:'repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)',backgroundSize:'20px 20px',pointerEvents:'none'}}/>
-      {/* Left white / Right black split at very bottom opacity */}
-      <div style={{position:'absolute',left:0,top:0,width:'50%',height:'100%',background:'linear-gradient(to right, #ffffff08, transparent)',pointerEvents:'none'}}/>
-
-      <div style={{textAlign:'center',marginBottom:44,position:'relative'}}>
-        <div style={{fontSize:9,letterSpacing:'0.5em',color:C.red,textTransform:'uppercase',marginBottom:18,fontWeight:700}}>◆ Murder Mystery VRChat ◆</div>
-
-        <MonokumaIcon size={80}/>
-
-        <div style={{marginTop:20,marginBottom:4,position:'relative',display:'inline-block'}}>
-          <h1 style={{margin:0,fontSize:58,fontWeight:900,letterSpacing:'0.06em',lineHeight:1,
-            background:`linear-gradient(to right, ${C.white} 50%, ${C.red} 50%)`,
-            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',
-            fontFamily:'Georgia,"Palatino Linotype",serif',
-          }}>DOSSIER</h1>
-        </div>
-
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginTop:10}}>
-          <div style={{height:1,width:40,background:C.border}}/>
-          <div style={{fontSize:9,color:C.textMuted,letterSpacing:'0.3em',textTransform:'uppercase',fontWeight:700}}>HOST TERMINAL</div>
-          <div style={{height:1,width:40,background:C.border}}/>
+    <div className="home">
+      <div className="home__bg-texture"/>
+      <div className="home__header">
+        <div className="home__eyebrow">◆ Murder Mystery VRChat ◆</div>
+        <LogoImage size/>
+        <h1 className="home__title">DOSSIER</h1>
+        <div className="home__divider-row">
+          <div className="home__divider-line"/>
+          <div className="home__divider-text">HOST TERMINAL</div>
+          <div className="home__divider-line"/>
         </div>
       </div>
-
       {session&&(
-        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderTop:`2px solid ${C.red}`,borderRadius:R,padding:18,maxWidth:340,width:'100%',marginBottom:18}}>
-          <div style={{fontSize:9,color:C.red,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:6,fontWeight:700}}>▶ Active Session</div>
-          <div style={{fontSize:16,color:C.text,fontWeight:700,marginBottom:4,letterSpacing:'0.02em'}}>{session.mapName||'Unnamed Map'}</div>
-          <div style={{fontSize:11,color:C.textDim,marginBottom:10}}>Host: {session.hostName||'—'} · {session.currentPhase} {Math.ceil(session.currentCycle/2)}</div>
-          <div style={{display:'flex',gap:12,fontSize:11,marginBottom:14}}>
-            <span style={{color:C.green,fontWeight:700}}>{session.players.filter(p=>p.alive).length} alive</span>
-            <span style={{color:C.textMuted}}>◆</span>
-            <span style={{color:C.red,fontWeight:700}}>{session.players.filter(p=>!p.alive).length} dead</span>
-            <span style={{color:C.textMuted}}>◆</span>
-            <span style={{color:C.textDim}}>{session.players.length} total</span>
+        <div className="home__session-card">
+          <div className="home__session-eyebrow">▶ Active Session</div>
+          <div className="home__session-title">{session.mapName||'Unnamed Map'}</div>
+          <div className="home__session-meta">Host: {session.hostName||'—'} · {session.currentPhase} {Math.ceil(session.currentCycle/2)}</div>
+          <div className="home__session-stats">
+            <span className="stats-bar__alive">{session.players.filter(p=>p.alive).length} alive</span>
+            <span className="stats-bar__dim">◆</span>
+            <span className="stats-bar__dead">{session.players.filter(p=>!p.alive).length} dead</span>
+            <span className="stats-bar__dim">◆</span>
+            <span className="stats-bar__total">{session.players.length} total</span>
           </div>
-          <div style={{display:'flex',gap:8}}>
-            <Btn variant="primary" onClick={onContinue} style={{flex:1}}>Continue Session</Btn>
+          <div className="home__session-actions">
+            <Btn variant="primary" onClick={onContinue} className="btn--full">Continue Session</Btn>
             <Btn variant="ghost" small onClick={onClear}>Abandon</Btn>
           </div>
         </div>
@@ -292,24 +229,24 @@ function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
   const complete=()=>onComplete({...ruleset,teams},meta,players);
   const steps=['Session','Ruleset','Players'];
   return(
-    <div style={{height:'100vh',background:C.bg,fontFamily:font,color:C.text,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{display:'flex',alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0}}>
-        <button onClick={onBack} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:16,marginRight:10}}>←</button>
-        <div style={{fontSize:13,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase'}}>New Session</div>
-        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+    <div className="setup">
+      <div className="setup__header">
+        <button onClick={onBack} className="setup__back">←</button>
+        <div className="setup__title">New Session</div>
+        <div className="setup__header-actions">
           {step>0&&<Btn variant="ghost" small onClick={()=>setStep(s=>s-1)}>Back</Btn>}
           {step<2&&<Btn variant="primary" small onClick={()=>setStep(s=>s+1)} disabled={step===0&&!meta.hostName.trim()}>Next</Btn>}
           {step===2&&<Btn variant="primary" small onClick={complete} disabled={players.length<2}>Start Game</Btn>}
         </div>
       </div>
-      <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div className="setup__steps">
         {steps.map((lbl,i)=>(
-          <div key={i} onClick={()=>i<=step&&setStep(i)} style={{flex:1,padding:'8px 12px',textAlign:'center',borderRight:i<2?`1px solid ${C.border}`:'none',cursor:i<=step?'pointer':'default',background:step===i?C.surfaceRaised:C.surface,borderBottom:step===i?`2px solid ${C.red}`:'2px solid transparent'}}>
-            <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:step===i?C.red:step>i?C.textDim:C.textMuted}}>{step>i?'✓ ':''}{lbl}</span>
+          <div key={i} onClick={()=>i<=step&&setStep(i)} className={`setup__step ${step===i?'setup__step--active':''} ${step>i?'setup__step--done':''}`}>
+            <span className="setup__step-label">{step>i?'✓ ':''}{lbl}</span>
           </div>
         ))}
       </div>
-      <div style={{flex:1,overflow:'auto',padding:'16px 16px 40px'}}>
+      <div className="setup__body">
         {step===0&&<>
           <Fld label="Host *"><Inp value={meta.hostName} onChange={v=>setMeta(m=>({...m,hostName:v}))} placeholder="Your name"/></Fld>
           <Fld label="Co-Host"><Inp value={meta.coHostName} onChange={v=>setMeta(m=>({...m,coHostName:v}))} placeholder="Co-host (optional)"/></Fld>
@@ -319,7 +256,7 @@ function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
           <Fld label="Teams (comma-separated)">
             <Inp value={teamInput} onChange={setTeamInput} placeholder="Mastermind, Despair, Student"/>
             <div style={{display:'flex',flexWrap:'wrap',gap:5,marginTop:8}}>
-              {teams.map(t=><div key={t} style={{background:teamColor(t),color:'#fff',borderRadius:2,padding:'3px 8px',fontSize:10,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase'}}>{t}</div>)}
+              {teams.map(t=><div key={t} className="team-badge" style={{'--accent':teamColor(t)}}>{t}</div>)}
             </div>
           </Fld>
           <Hr/>
@@ -330,46 +267,49 @@ function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
             ))}
           </div>
           <Hr/>
-          <div onClick={()=>setLibOpen(s=>!s)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',marginBottom:libOpen?10:0,padding:'4px 0'}}>
-            <Lbl style={{margin:0}}>Effect Library <span style={{color:C.textMuted,textTransform:'none',fontWeight:400,letterSpacing:0}}>(optional)</span></Lbl>
-            <span style={{fontSize:11,color:C.textDim}}>{(ruleset.buffLibrary||[]).length>0?`${(ruleset.buffLibrary||[]).length} defined`:'empty'} {libOpen?'▲':'▼'}</span>
+          <div onClick={()=>setLibOpen(s=>!s)} className="collapsible-header" style={{marginBottom:libOpen?10:0}}>
+            <Lbl style={{margin:0}}>Effect Library <span style={{color:'var(--text-muted)',textTransform:'none',fontWeight:400,letterSpacing:0}}>(optional)</span></Lbl>
+            <span style={{fontSize:11,color:'var(--text-dim)'}}>{(ruleset.buffLibrary||[]).length>0?`${(ruleset.buffLibrary||[]).length} defined`:'empty'} {libOpen?'▲':'▼'}</span>
           </div>
           {libOpen&&<div>
-            <div style={{fontSize:11,color:C.textDim,marginBottom:10}}>Define effects available in-game. Duration & permanent are chosen when applying.</div>
+            <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:10}}>Define effects available in-game. Duration & permanent are chosen when applying.</div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:7,marginBottom:10}}>
               <Inp value={libForm.name} onChange={v=>setLibForm(a=>({...a,name:v}))} placeholder="Effect name" onKeyDown={e=>e.key==='Enter'&&addToLib()}/>
               <SelEl value={libForm.type} onChange={v=>setLibForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
               <Btn small variant="primary" onClick={addToLib} disabled={!libForm.name.trim()}>+</Btn>
             </div>
-            {(ruleset.buffLibrary||[]).length===0&&<div style={{fontSize:11,color:C.textMuted,fontStyle:'italic'}}>No effects defined yet</div>}
+            {(ruleset.buffLibrary||[]).length===0&&<div style={{fontSize:11,color:'var(--text-muted)',fontStyle:'italic'}}>No effects defined yet</div>}
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {(ruleset.buffLibrary||[]).map(item=>(
-                <div key={item.id} style={{display:'flex',alignItems:'center',gap:5,padding:'4px 8px 4px 10px',background:EFF[effKey(item.type)]?.bg||C.surfaceRaised,border:`1px solid ${EFF[effKey(item.type)]?.border||C.border}`,borderRadius:2}}>
-                  <span style={{fontSize:10,color:EFF[effKey(item.type)]?.text||C.text,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{item.name}</span>
-                  <button onClick={()=>removeFromLib(item.id)} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:12,padding:'0 0 0 4px',lineHeight:1}}>✕</button>
+              {(ruleset.buffLibrary||[]).map(item=>{const e=EFF[effKey(item.type)]||EFF.buff;return(
+                <div key={item.id} className="lib-chip" style={{'--chip-bg':e.bg,'--chip-border':e.accent,'--chip-text':e.text}}>
+                  <span className="lib-chip__label">{item.name}</span>
+                  <button onClick={()=>removeFromLib(item.id)} className="lib-chip__remove">✕</button>
                 </div>
-              ))}
+              );})}
             </div>
           </div>}
         </>}
         {step===2&&<>
           {recentPlayers.length>0&&(
-            <div style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,marginBottom:14,overflow:'hidden'}}>
-              <button onClick={()=>setShowRecent(s=>!s)} style={{width:'100%',background:'none',border:'none',padding:'10px 13px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',fontFamily:font}}>
-                <span style={{fontSize:10,fontWeight:700,color:C.textDim,textTransform:'uppercase',letterSpacing:'0.1em'}}>Recent Players ({recentPlayers.length})</span>
-                <span style={{fontSize:11,color:C.textDim}}>{showRecent?'▲':'▼'}</span>
+            <div className="panel" style={{marginBottom:14,padding:0,overflow:'hidden'}}>
+              <button onClick={()=>setShowRecent(s=>!s)} className="collapsible-header collapsible-header--panel">
+                <span style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',textTransform:'uppercase',letterSpacing:'0.1em'}}>Recent Players ({recentPlayers.length})</span>
+                <span style={{fontSize:11,color:'var(--text-dim)'}}>{showRecent?'▲':'▼'}</span>
               </button>
               {showRecent&&<div style={{padding:'0 10px 10px',display:'flex',flexWrap:'wrap',gap:6}}>
                 {recentPlayers.map((rp,i)=>{const already=players.some(p=>p.name.toLowerCase()===rp.name.toLowerCase());return(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 8px 5px 10px',background:C.surface,border:`1px solid ${C.border}`,borderLeft:`3px solid ${teamColor(rp.team)}`,borderRadius:R,opacity:already?0.4:1}}>
-                    <div><div style={{fontSize:12,fontWeight:700}}>{rp.name}</div><div style={{fontSize:10,color:C.textDim}}>{rp.team}{rp.role?` · ${rp.role}`:''}</div></div>
-                    <button onClick={()=>!already&&addRecentPlayer(rp)} disabled={already} style={{background:already?'none':C.red,border:`1px solid ${already?C.border:C.red}`,color:already?C.textMuted:'#fff',borderRadius:2,padding:'3px 8px',cursor:already?'not-allowed':'pointer',fontSize:12,fontFamily:font,fontWeight:700}}>{already?'✓':'+'}</button>
+                  <div key={i} className={`recent-chip ${already?'recent-chip--added':''}`} style={{'--accent':teamColor(rp.team)}}>
+                    <div><div className="recent-chip__name">{rp.name}</div><div className="recent-chip__meta">{rp.team}{rp.role?` · ${rp.role}`:''}</div></div>
+                    <button onClick={()=>!already&&addRecentPlayer(rp)} disabled={already} className="recent-chip__add"
+                      style={already?{'--add-bg':'none','--add-border':'var(--border)','--add-color':'var(--text-muted)'}:{}}>
+                      {already?'✓':'+'}
+                    </button>
                   </div>
                 );})}
               </div>}
             </div>
           )}
-          <div style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,padding:12,marginBottom:14}}>
+          <div className="panel" style={{marginBottom:14}}>
             <Lbl>Add Player</Lbl>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 2fr auto',gap:7,alignItems:'flex-end'}}>
               <Inp value={pForm.name} onChange={v=>setPForm(p=>({...p,name:v}))} placeholder="Name" onKeyDown={e=>e.key==='Enter'&&addPlayer()}/>
@@ -380,13 +320,13 @@ function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
           </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
             <Lbl style={{margin:0}}>{players.length} player{players.length!==1?'s':''}</Lbl>
-            {players.length<2&&<div style={{fontSize:10,color:C.textMuted}}>Min. 2 to start</div>}
+            {players.length<2&&<div style={{fontSize:10,color:'var(--text-muted)'}}>Min. 2 to start</div>}
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {players.map(p=>(
-              <div key={p.id} style={{background:C.surface,border:`1px solid ${C.border}`,borderLeft:`3px solid ${teamColor(p.team)}`,borderRadius:R,padding:'8px 12px',display:'flex',alignItems:'center',gap:10}}>
-                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><div style={{fontSize:10,color:C.textDim,textTransform:'uppercase',letterSpacing:'0.04em'}}>{p.team}{p.role?` · ${p.role}`:''}</div></div>
-                <button onClick={()=>setPlayers(prev=>prev.filter(x=>x.id!==p.id))} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:15}}>✕</button>
+              <div key={p.id} className="player-row" style={{'--accent':teamColor(p.team)}}>
+                <div style={{flex:1}}><div className="player-row__name">{p.name}</div><div className="player-row__meta">{p.team}{p.role?` · ${p.role}`:''}</div></div>
+                <button onClick={()=>setPlayers(prev=>prev.filter(x=>x.id!==p.id))} className="player-row__remove">✕</button>
               </div>
             ))}
           </div>
@@ -423,15 +363,15 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
   const hasLib=library.length>0;
   const activeEff=p.effects.filter(e=>!e.manuallyExpired);
   const DurRow=()=>(
-    <div style={{display:'flex',gap:5,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
-      {!applyPermanent&&<>{[12,24,48,72].map(h=><button key={h} onClick={()=>setApplyHours(h)} style={{padding:'4px 10px',borderRadius:R,fontSize:11,fontFamily:font,cursor:'pointer',fontWeight:applyHours===h?700:400,background:applyHours===h?C.red:C.surfaceRaised,color:applyHours===h?'#fff':C.textDim,border:`1px solid ${applyHours===h?C.red:C.border}`,transition:'all 0.1s'}}>{h}h</button>)}
-        <div style={{display:'flex',alignItems:'center',gap:4}}>
-          <Inp type="number" min="12" step="12" value={applyHours} onChange={v=>setApplyHours(Math.max(12,Math.round((+v||12)/12)*12))} style={{width:52,textAlign:'center',padding:'4px 6px',fontSize:12}}/>
-          <span style={{fontSize:10,color:C.textDim}}>h</span>
+    <div className="dur-row">
+      {!applyPermanent&&<>{[12,24,48,72].map(h=><button key={h} onClick={()=>setApplyHours(h)} className={`dur-preset ${applyHours===h?'dur-preset--active':''}`}>{h}h</button>)}
+        <div className="dur-input-wrap">
+          <Inp type="number" min="12" step="12" value={applyHours} onChange={v=>setApplyHours(Math.max(12,Math.round((+v||12)/12)*12))}/>
+          <span style={{fontSize:10,color:'var(--text-dim)'}}>h</span>
         </div>
       </>}
-      {applyPermanent&&<div style={{fontSize:12,color:C.red,fontWeight:700,letterSpacing:'0.04em'}}>∞ NO EXPIRATION</div>}
-      <button onClick={()=>setApplyPermanent(s=>!s)} style={{marginLeft:'auto',padding:'5px 12px',borderRadius:R,fontSize:11,fontFamily:font,cursor:'pointer',fontWeight:700,background:applyPermanent?C.red:'transparent',color:applyPermanent?'#fff':C.textDim,border:`2px solid ${applyPermanent?C.red:C.border}`,transition:'all 0.15s',letterSpacing:'0.04em'}}>∞ PERMANENT</button>
+      {applyPermanent&&<div className="permanent-flag">∞ NO EXPIRATION</div>}
+      <button onClick={()=>setApplyPermanent(s=>!s)} className={`permanent-toggle ${applyPermanent?'permanent-toggle--active':''}`}>∞ PERMANENT</button>
     </div>
   );
   return(
@@ -442,102 +382,103 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
         <Fld label="Class"><Inp value={p.role} onChange={v=>save({...p,role:v})} placeholder="Class"/></Fld>
       </div>
       {p.role&&p.role.trim()&&(
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,marginBottom:12}}>
-          <span style={{fontSize:11,color:C.textDim,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em'}}>🗳 Trial Votes</span>
+        <div className="vote-weight-row">
+          <span className="vote-weight-row__label">🗳 Trial Votes</span>
           <div style={{flex:1}}/>
           <Btn small onClick={()=>save({...p,voteWeight:Math.max(1,(p.voteWeight||1)-1)})}>−</Btn>
-          <div style={{minWidth:24,textAlign:'center',fontFamily:MONO_FONT,fontSize:16,fontWeight:800,color:C.red}}>{p.voteWeight||1}</div>
+          <div className="vote-weight-row__value">{p.voteWeight||1}</div>
           <Btn small onClick={()=>save({...p,voteWeight:(p.voteWeight||1)+1})}>+</Btn>
         </div>
       )}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:p.alive?C.greenDim:'#1A0000',border:`1px solid ${p.alive?C.green:C.red}`,borderRadius:R,marginBottom:12}}>
-        <span style={{fontSize:12,fontWeight:700,color:p.alive?C.green:C.red,letterSpacing:'0.06em',textTransform:'uppercase'}}>{p.alive?'▶ ALIVE':'✕ DEAD'}</span>
+      <div className="alive-status-bar" style={{'--status-bg':p.alive?'var(--green-dim)':'#1A0000','--status-border':p.alive?'var(--green)':'var(--red)'}}>
+        <span className="alive-status-bar__text">{p.alive?'▶ ALIVE':'✕ DEAD'}</span>
         <Btn small variant={p.alive?'danger':'success'} onClick={()=>save({...p,alive:!p.alive})}>{p.alive?'Mark as Dead':'Revive'}</Btn>
       </div>
       <Hr/>
       <Lbl>Active Effects ({activeEff.length})</Lbl>
-      {activeEff.map(e=>{const rem=remIG(e,cycle);return(
-        <div key={e.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.surfaceRaised,border:`1px solid ${C.border}`,borderLeft:`3px solid ${EFF[effKey(e.type)]?.border||C.border}`,borderRadius:R,marginBottom:4}}>
+      {activeEff.map(e=>{const rem=remIG(e,cycle);const eff=EFF[effKey(e.type)]||EFF.buff;return(
+        <div key={e.id} className="applied-effect-row" style={{'--eff-accent':eff.accent}}>
           <Tag type={e.type}>{e.type}</Tag>
-          <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600}}>{e.name}{e.permanent&&<span style={{color:C.red,marginLeft:5,fontSize:11}}>∞</span>}</div><div style={{fontSize:9,color:C.textDim,textTransform:'uppercase',letterSpacing:'0.04em'}}>{e.permanent?'PERMANENT':rem!==null?`${rem}h IG remaining · exp. cycle ${e.expiresOnCycle}`:''}</div></div>
+          <div style={{flex:1}}><div className="applied-effect-row__name">{e.name}{e.permanent&&<span className="applied-effect-row__perm">∞</span>}</div><div className="applied-effect-row__meta">{e.permanent?'PERMANENT':rem!==null?`${rem}h IG remaining · exp. cycle ${e.expiresOnCycle}`:''}</div></div>
           <Btn small variant="ghost" onClick={()=>save({...p,effects:p.effects.filter(x=>x.id!==e.id)})}>✕</Btn>
         </div>
       );})}
-      {activeEff.length===0&&<div style={{fontSize:11,color:C.textMuted,marginBottom:8}}>No active effects</div>}
+      {activeEff.length===0&&<div style={{fontSize:11,color:'var(--text-muted)',marginBottom:8}}>No active effects</div>}
       <Hr/>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
         <Lbl style={{margin:0}}>Apply Effect</Lbl>
         {hasLib&&<Btn small onClick={rollRandom}>🎲 Random</Btn>}
       </div>
-      {rolledItem&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:`${C.red}22`,border:`1px solid ${C.red}`,borderRadius:R,marginBottom:8}}>
-        <span style={{fontSize:10,color:C.textDim,flexShrink:0,textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:700}}>Rolled:</span>
+      {rolledItem&&<div className="rolled-banner">
+        <span className="rolled-banner__label">Rolled:</span>
         <Tag type={rolledItem.type}>{rolledItem.type}</Tag>
-        <span style={{fontSize:13,fontWeight:700,flex:1}}>{rolledItem.name}</span>
+        <span className="rolled-banner__name">{rolledItem.name}</span>
         <Btn small variant="ghost" onClick={rollRandom}>↺ Re-roll</Btn>
       </div>}
       {hasLib?(
         <>
           <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10}}>
             {['todos',...effTypes.filter(t=>library.some(i=>i.type===t))].map(t=>{const count=t==='todos'?library.length:library.filter(i=>i.type===t).length;return(
-              <button key={t} onClick={()=>{setFilterType(t);setSelectedLib(null);setRolledItem(null);}} style={{padding:'3px 9px',borderRadius:R,fontSize:10,fontFamily:font,cursor:'pointer',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',background:filterType===t?C.red:C.surfaceRaised,color:filterType===t?'#fff':C.textDim,border:`1px solid ${filterType===t?C.red:C.border}`}}>
+              <button key={t} onClick={()=>{setFilterType(t);setSelectedLib(null);setRolledItem(null);}} className={`pill ${filterType===t?'pill--active':''}`} style={{textTransform:'uppercase',fontWeight:700,letterSpacing:'0.06em'}}>
                 {t==='todos'?'All':t} ({count})
               </button>
             );})}
           </div>
           {Object.entries(byType).map(([type,items])=>(
             <div key={type} style={{marginBottom:10}}>
-              {filterType==='todos'&&<div style={{fontSize:9,color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:5,fontWeight:700}}>{type}</div>}
+              {filterType==='todos'&&<div className="lib-type-heading">{type}</div>}
               <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-                {items.map(item=>{const col=EFF[effKey(item.type)]||EFF.buff;const sel=selectedLib?.id===item.id;return(
-                  <button key={item.id} onClick={()=>sel?setSelectedLib(null):selectLib(item)} style={{padding:'5px 11px',borderRadius:R,fontSize:11,fontFamily:font,cursor:'pointer',fontWeight:sel?700:500,background:sel?col.bg:C.surfaceRaised,color:sel?col.text:C.textDim,border:`1px solid ${sel?col.border:C.border}`,textTransform:'uppercase',letterSpacing:'0.04em'}}>
+                {items.map(item=>{const eff=EFF[effKey(item.type)]||EFF.buff;const sel=selectedLib?.id===item.id;return(
+                  <button key={item.id} onClick={()=>sel?setSelectedLib(null):selectLib(item)} className={`lib-pill ${sel?'lib-pill--selected':''}`}
+                    style={sel?{'--lib-bg':eff.bg,'--lib-text':eff.text,'--lib-border':eff.accent}:{}}>
                     {item.name}
                   </button>
                 );})}
               </div>
             </div>
           ))}
-          {selectedLib&&(
-            <div style={{background:(EFF[effKey(selectedLib.type)]?.bg||C.surfaceRaised),border:`1px solid ${EFF[effKey(selectedLib.type)]?.border||C.border}`,borderRadius:R,padding:'10px 12px',marginTop:4,marginBottom:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+          {selectedLib&&(()=>{const eff=EFF[effKey(selectedLib.type)]||EFF.buff;return(
+            <div className="confirm-apply-panel" style={{'--cap-bg':eff.bg,'--cap-border':eff.accent,'--cap-text':eff.text}}>
+              <div className="confirm-apply-panel__head">
                 <Tag type={selectedLib.type}>{selectedLib.type}</Tag>
-                <span style={{fontSize:13,fontWeight:700,color:EFF[effKey(selectedLib.type)]?.text||C.text,flex:1,textTransform:'uppercase',letterSpacing:'0.04em'}}>{selectedLib.name}</span>
-                <button onClick={()=>{setSelectedLib(null);setRolledItem(null);}} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:15,lineHeight:1}}>✕</button>
+                <span className="confirm-apply-panel__name">{selectedLib.name}</span>
+                <button onClick={()=>{setSelectedLib(null);setRolledItem(null);}} className="confirm-apply-panel__close">✕</button>
               </div>
               <DurRow/>
-              {!applyPermanent&&<div style={{fontSize:9,color:EFF[effKey(selectedLib.type)]?.text||C.textDim,opacity:0.7,marginBottom:10,textTransform:'uppercase',letterSpacing:'0.04em'}}>{fmtIG(Math.round(applyHours/12))} · expires cycle {cycle+Math.round(applyHours/12)}</div>}
-              <Btn variant="primary" onClick={()=>applyEffect(selectedLib.name,selectedLib.type,applyHours,applyPermanent)} style={{width:'100%',justifyContent:'center',fontWeight:700,letterSpacing:'0.06em'}}>Apply {selectedLib.name.toUpperCase()}</Btn>
+              {!applyPermanent&&<div className="confirm-apply-panel__meta">{fmtIG(Math.round(applyHours/12))} · expires cycle {cycle+Math.round(applyHours/12)}</div>}
+              <Btn variant="primary" full onClick={()=>applyEffect(selectedLib.name,selectedLib.type,applyHours,applyPermanent)} style={{fontWeight:700,letterSpacing:'0.06em'}}>Apply {selectedLib.name.toUpperCase()}</Btn>
             </div>
-          )}
-          {!customMode?<button onClick={()=>setCustomMode(true)} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:10,fontFamily:font,padding:'4px 0',marginTop:2,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:700}}>+ Custom effect</button>:(
-            <div style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,padding:'10px 12px',marginTop:6}}>
+          );})()}
+          {!customMode?<button onClick={()=>setCustomMode(true)} style={{background:'none',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:10,fontFamily:'inherit',padding:'4px 0',marginTop:2,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:700}}>+ Custom effect</button>:(
+            <div className="panel" style={{marginTop:6}}>
               <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:7,marginBottom:8}}>
                 <Inp value={customForm.name} onChange={v=>setCustomForm(a=>({...a,name:v}))} placeholder="Effect name"/>
                 <SelEl value={customForm.type} onChange={v=>setCustomForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
-                <button onClick={()=>setCustomMode(false)} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:15,padding:'0 4px'}}>✕</button>
+                <button onClick={()=>setCustomMode(false)} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:15,padding:'0 4px'}}>✕</button>
               </div>
               <DurRow/>
-              <Btn variant="primary" onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()} style={{width:'100%',justifyContent:'center'}}>Apply Effect</Btn>
+              <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
             </div>
           )}
         </>
       ):(
-        <div style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,padding:'10px 12px'}}>
+        <div className="panel">
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:7,marginBottom:8}}>
             <Inp value={customForm.name} onChange={v=>setCustomForm(a=>({...a,name:v}))} placeholder="Effect name"/>
             <SelEl value={customForm.type} onChange={v=>setCustomForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
           </div>
           <DurRow/>
-          <Btn variant="primary" onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()} style={{width:'100%',justifyContent:'center'}}>Apply Effect</Btn>
-          <div style={{fontSize:9,color:C.textMuted,marginTop:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Tip: define an effect library in setup for 1-tap chips</div>
+          <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
+          <div style={{fontSize:9,color:'var(--text-muted)',marginTop:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Tip: define an effect library in setup for 1-tap chips</div>
         </div>
       )}
       <Hr/>
       <Lbl>Counters</Lbl>
       {Object.entries(p.counters).map(([name,val])=>(
-        <div key={name} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-          <div style={{flex:1,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>{name}</div>
+        <div key={name} className="counter-row">
+          <div className="counter-row__name">{name}</div>
           <Btn small onClick={()=>save({...p,counters:{...p.counters,[name]:Math.max(0,val-1)}})}>−</Btn>
-          <div style={{minWidth:28,textAlign:'center',fontFamily:MONO_FONT,fontSize:18,fontWeight:700,color:C.red}}>{val}</div>
+          <div className="counter-row__value">{val}</div>
           <Btn small onClick={()=>save({...p,counters:{...p.counters,[name]:val+1}})}>+</Btn>
           <Btn small variant="ghost" onClick={()=>{const c={...p.counters};delete c[name];save({...p,counters:c});}}>✕</Btn>
         </div>
@@ -552,8 +493,7 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
         <Fld label="Partner / Twin"><SelEl value={p.partnerId||''} onChange={v=>save({...p,partnerId:v||null})} options={pOpts}/></Fld>
       </div>
       <Fld label="Notes">
-        <textarea value={p.notes} onChange={e=>setP(x=>({...x,notes:e.target.value}))} onBlur={()=>onUpdate(p)} placeholder="Free notes..."
-          style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,color:C.text,borderRadius:R,padding:'8px 12px',fontSize:12,fontFamily:font,outline:'none',width:'100%',boxSizing:'border-box',minHeight:60,resize:'vertical'}}/>
+        <textarea value={p.notes} onChange={e=>setP(x=>({...x,notes:e.target.value}))} onBlur={()=>onUpdate(p)} placeholder="Free notes..." className="textarea"/>
       </Fld>
       <Hr/>
       <Btn variant="danger" small onClick={onRemove}>Remove Player</Btn>
@@ -578,20 +518,20 @@ function DeathModal({session,onConfirm,onClose}){
       <Fld label={`Witnesses (${f.witnessIds.length}) — informative`}>
         <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
           {all.filter(p=>p.id!==f.victimId&&p.id!==f.killerId).map(p=>(
-            <button key={p.id} onClick={()=>togW(p.id)} style={{padding:'4px 9px',borderRadius:R,fontSize:11,background:f.witnessIds.includes(p.id)?C.red:C.surfaceRaised,color:f.witnessIds.includes(p.id)?'#fff':C.textDim,border:`1px solid ${f.witnessIds.includes(p.id)?C.red:C.border}`,cursor:'pointer',fontFamily:font}}>{p.name}</button>
+            <Pill key={p.id} active={f.witnessIds.includes(p.id)} onClick={()=>togW(p.id)}>{p.name}</Pill>
           ))}
         </div>
-        <div style={{fontSize:9,color:C.textDim,marginTop:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Never blocks registration — informative only</div>
+        <div style={{fontSize:9,color:'var(--text-dim)',marginTop:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Never blocks registration — informative only</div>
       </Fld>
       {!showAccomplice?(
         f.accompliceId
-          ?<div style={{fontSize:11,color:C.textDim,marginBottom:14}}>Accomplice: <strong style={{color:C.text}}>{all.find(p=>p.id===f.accompliceId)?.name}</strong> · <button onClick={()=>setShowAccomplice(true)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:11,fontFamily:font,padding:0}}>change</button></div>
-          :<button onClick={()=>setShowAccomplice(true)} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:10,fontFamily:font,padding:0,marginBottom:14,textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:600}}>+ Accomplice (uncommon)</button>
+          ?<div style={{fontSize:11,color:'var(--text-dim)',marginBottom:14}}>Accomplice: <strong style={{color:'var(--text)'}}>{all.find(p=>p.id===f.accompliceId)?.name}</strong> · <button onClick={()=>setShowAccomplice(true)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:11,fontFamily:'inherit',padding:0}}>change</button></div>
+          :<button onClick={()=>setShowAccomplice(true)} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:10,fontFamily:'inherit',padding:0,marginBottom:14,textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:600}}>+ Accomplice (uncommon)</button>
       ):(
         <Fld label="Accomplice (uncommon)"><SelEl value={f.accompliceId} onChange={v=>setF(x=>({...x,accompliceId:v}))} options={[{value:'',label:'— None'},...all.filter(p=>p.id!==f.victimId).map(p=>({value:p.id,label:p.name}))]}/></Fld>
       )}
       <div style={{display:'flex',gap:8}}>
-        <Btn variant="primary" onClick={()=>onConfirm(f)} disabled={!f.victimId} style={{flex:1,justifyContent:'center'}}>Confirm Death</Btn>
+        <Btn variant="primary" full onClick={()=>onConfirm(f)} disabled={!f.victimId}>Confirm Death</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
     </Modal>
@@ -616,23 +556,21 @@ function TrialModal({session,onUpdate,onClose}){
   return(
     <Modal title={`⚖ Trial · ${trialPhase} ${trialDayNum}`} onClose={()=>onClose(trial.result,null,false)} wide>
       <Fld label="Teams excluded from vote count">
-        <div style={{fontSize:11,color:C.textDim,marginBottom:8,lineHeight:1.5}}>
-          Votes cast <strong style={{color:C.text}}>by</strong> players on a selected team won't be counted in the totals below — use this when a team's votes don't count toward the verdict (e.g. excluding Despair during the final trial).
+        <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:8,lineHeight:1.5}}>
+          Votes cast <strong style={{color:'var(--text)'}}>by</strong> players on a selected team won't be counted in the totals below — use this when a team's votes don't count toward the verdict (e.g. excluding Despair during the final trial).
         </div>
         <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
           {rs.teams.map(t=>(
-            <button key={t} onClick={()=>updateTrial({...trial,excludedTeams:tog(trial.excludedTeams,t)})}
-              style={{padding:'4px 9px',borderRadius:R,fontSize:11,background:trial.excludedTeams.includes(t)?C.redDim:C.surfaceRaised,color:trial.excludedTeams.includes(t)?C.red:C.textDim,border:`1px solid ${trial.excludedTeams.includes(t)?C.red:C.border}`,cursor:'pointer',fontFamily:font,fontWeight:trial.excludedTeams.includes(t)?700:400}}>{t}</button>
+            <Pill key={t} activeMuted={trial.excludedTeams.includes(t)} onClick={()=>updateTrial({...trial,excludedTeams:tog(trial.excludedTeams,t)})}>{t}</Pill>
           ))}
-          {rs.teams.length>0&&trial.excludedTeams.length===0&&<span style={{fontSize:10,color:C.textMuted,alignSelf:'center'}}>None excluded — all votes count</span>}
+          {rs.teams.length>0&&trial.excludedTeams.length===0&&<span style={{fontSize:10,color:'var(--text-muted)',alignSelf:'center'}}>None excluded — all votes count</span>}
         </div>
-        <div style={{fontSize:9,color:C.textDim,marginTop:8,textTransform:'uppercase',letterSpacing:'0.04em'}}>
+        <div style={{fontSize:9,color:'var(--text-dim)',marginTop:8,textTransform:'uppercase',letterSpacing:'0.04em'}}>
           Self-vote ×{trial.autoVoteMultiplier} ·{' '}
-          <button onClick={()=>updateTrial({...trial,autoVoteMultiplier:trial.autoVoteMultiplier===2?3:2})} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:9,fontFamily:font,padding:0,textTransform:'uppercase',letterSpacing:'0.04em',fontWeight:700}}>switch to ×{trial.autoVoteMultiplier===2?3:2}</button>
+          <button onClick={()=>updateTrial({...trial,autoVoteMultiplier:trial.autoVoteMultiplier===2?3:2})} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:9,fontFamily:'inherit',padding:0,textTransform:'uppercase',letterSpacing:'0.04em',fontWeight:700}}>switch to ×{trial.autoVoteMultiplier===2?3:2}</button>
         </div>
       </Fld>
       <Hr/>
-      {/* DEATH RECORD + ACCUSATION */}
       {(()=>{
         const cycleDeaths=session.deaths.filter(d=>d.cycle===trial.cycle);
         const accused=trial.accusedId?getP(trial.accusedId):null;
@@ -643,15 +581,11 @@ function TrialModal({session,onUpdate,onClose}){
                 {cycleDeaths.map(d=>{
                   const victim=getP(d.victimId);const killer=d.killerId?getP(d.killerId):null;
                   return(
-                    <div key={d.id} style={{background:'#1A0000',border:`1px solid ${C.redDim}`,borderLeft:`3px solid ${C.red}`,borderRadius:R,padding:'8px 10px',marginBottom:6}}>
-                      <div style={{fontSize:11,color:C.textDim}}>
-                        <strong style={{color:C.text}}>{victim?.name||'?'}</strong> was killed{killer&&<> by <strong style={{color:C.red}}>{killer.name}</strong></>}{d.weapon?<> · {d.weapon}</>:''}{d.location?<> · {d.location}</>:''}
+                    <div key={d.id} className="death-record">
+                      <div className="death-record__text">
+                        <strong style={{color:'var(--text)'}}>{victim?.name||'?'}</strong> was killed{killer&&<> by <strong style={{color:'var(--red)'}}>{killer.name}</strong></>}{d.weapon?<> · {d.weapon}</>:''}{d.location?<> · {d.location}</>:''}
                       </div>
-                      {killer&&(
-                        <button onClick={()=>updateTrial({...trial,accusedId:d.killerId})} style={{marginTop:6,background:'none',border:`1px solid ${C.red}`,color:C.red,borderRadius:R,padding:'3px 9px',cursor:'pointer',fontSize:10,fontFamily:font,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>
-                          Accuse {killer.name}
-                        </button>
-                      )}
+                      {killer&&<button onClick={()=>updateTrial({...trial,accusedId:d.killerId})} className="death-record__accuse-btn">Accuse {killer.name}</button>}
                     </div>
                   );
                 })}
@@ -661,8 +595,8 @@ function TrialModal({session,onUpdate,onClose}){
             <SelEl value={trial.accusedId||''} onChange={v=>updateTrial({...trial,accusedId:v||null})} options={[{value:'',label:'— Not decided'},...session.players.map(p=>({value:p.id,label:p.name+(p.alive?'':' (dead)')}))]}/>
             {accused&&cycleDeaths.some(d=>d.killerId)&&(
               cycleDeaths.some(d=>d.killerId===trial.accusedId)
-                ?<div style={{fontSize:10,color:C.green,fontWeight:700,marginTop:6,textTransform:'uppercase',letterSpacing:'0.04em'}}>✓ Matches the recorded killer</div>
-                :<div style={{fontSize:10,color:C.red,fontWeight:700,marginTop:6,textTransform:'uppercase',letterSpacing:'0.04em'}}>✗ Does not match the recorded killer</div>
+                ?<div className="match-indicator match-indicator--yes">✓ Matches the recorded killer</div>
+                :<div className="match-indicator match-indicator--no">✗ Does not match the recorded killer</div>
             )}
           </Fld>
         );
@@ -671,8 +605,7 @@ function TrialModal({session,onUpdate,onClose}){
       <Fld label="Players present">
         <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
           {alivePlayers.map(p=>(
-            <button key={p.id} onClick={()=>updateTrial({...trial,presentPlayerIds:tog(trial.presentPlayerIds,p.id)})}
-              style={{padding:'5px 10px',borderRadius:R,fontSize:11,background:trial.presentPlayerIds.includes(p.id)?C.red:C.surfaceRaised,color:trial.presentPlayerIds.includes(p.id)?'#fff':C.textDim,border:`1px solid ${trial.presentPlayerIds.includes(p.id)?C.red:C.border}`,cursor:'pointer',fontFamily:font,fontWeight:trial.presentPlayerIds.includes(p.id)?700:400}}>{p.name}</button>
+            <Pill key={p.id} active={trial.presentPlayerIds.includes(p.id)} onClick={()=>updateTrial({...trial,presentPlayerIds:tog(trial.presentPlayerIds,p.id)})}>{p.name}</Pill>
           ))}
         </div>
       </Fld>
@@ -681,10 +614,10 @@ function TrialModal({session,onUpdate,onClose}){
         <Lbl>Votes ({Object.keys(trial.votes).filter(k=>present.some(p=>p.id===k)).length}/{present.length})</Lbl>
         <div style={{display:'flex',flexDirection:'column',gap:5}}>
           {present.map(voter=>{const excl=trial.excludedTeams.includes(voter.team);const voted=trial.votes[voter.id]||'';return(
-            <div key={voter.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:excl?C.surfaceRaised:C.surface,border:`1px solid ${C.border}`,borderRadius:R,opacity:excl?0.4:1}}>
-              <div style={{fontSize:11,fontWeight:600,minWidth:70,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{voter.name}{(voter.voteWeight||1)!==1&&<span style={{fontSize:9,color:C.red,fontWeight:800}}> ×{voter.voteWeight}</span>}{excl&&<span style={{fontSize:8,color:C.textMuted}}> (excl.)</span>}</div>
-              <span style={{color:C.border}}>→</span>
-              <div style={{flex:1}}>
+            <div key={voter.id} className={`vote-row ${excl?'vote-row--excluded':''}`}>
+              <div className="vote-row__name">{voter.name}{(voter.voteWeight||1)!==1&&<span className="vote-row__weight"> ×{voter.voteWeight}</span>}{excl&&<span className="vote-row__excl-tag"> (excl.)</span>}</div>
+              <span className="vote-row__arrow">→</span>
+              <div className="vote-row__select">
                 <SelEl value={voted} onChange={v=>{const vs={...trial.votes};if(v)vs[voter.id]=v;else delete vs[voter.id];updateTrial({...trial,votes:vs});}} options={[{value:'',label:'— No vote'},...present.filter(q=>q.id!==voter.id).map(q=>({value:q.id,label:q.name})),{value:voter.id,label:`${voter.name} (self ×${trial.autoVoteMultiplier})`}]} style={{fontSize:11,padding:'4px 8px'}}/>
               </div>
             </div>
@@ -696,37 +629,36 @@ function TrialModal({session,onUpdate,onClose}){
         <Lbl>Totals</Lbl>
         <div style={{display:'flex',flexDirection:'column',gap:4}}>
           {ranked.map(([pid,count],i)=>{const pp=getP(pid);return(
-            <div key={pid} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 10px',borderRadius:R,background:i===0?`${C.red}22`:C.surfaceRaised,border:`1px solid ${i===0?C.red:C.border}`,borderLeft:i===0?`3px solid ${C.red}`:`3px solid transparent`}}>
-              <div style={{flex:1,fontSize:12,fontWeight:i===0?700:400}}>{pp?.name||'?'}</div>
-              <div style={{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums',color:i===0?C.red:C.textDim,fontFamily:MONO_FONT}}>{count}</div>
+            <div key={pid} className="total-row" style={i===0?{'--total-bg':'rgba(204,0,0,0.13)','--total-border':'var(--red)','--total-accent':'var(--red)','--total-count-color':'var(--red)'}:{}}>
+              <div className="total-row__name" style={{fontWeight:i===0?700:400}}>{pp?.name||'?'}</div>
+              <div className="total-row__count">{count}</div>
             </div>
           );})}
         </div>
       </>}
       <Hr/>
-      {/* QUESTIONS */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
         <Lbl style={{margin:0}}>Questions ({trial.questions.length}/3)</Lbl>
         {trial.questions.length<3&&<Btn small onClick={()=>updateTrial({...trial,questions:[...trial.questions,newQuestion()]})}>+ Question</Btn>}
       </div>
-      {trial.questions.length===0&&<div style={{fontSize:11,color:C.textMuted,marginBottom:8}}>No questions added yet</div>}
+      {trial.questions.length===0&&<div style={{fontSize:11,color:'var(--text-muted)',marginBottom:8}}>No questions added yet</div>}
       {trial.questions.map((q,i)=>(
-        <div key={q.id} style={{background:C.surface,border:`1px solid ${C.border}`,borderLeft:`3px solid ${q.answer==='true'?C.green:q.answer==='false'?C.red:C.border}`,borderRadius:R,padding:'10px 12px',marginBottom:8}}>
-          <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:8}}>
-            <div style={{fontSize:9,fontWeight:700,color:q.answer==='true'?C.green:q.answer==='false'?C.red:C.textMuted,background:C.surfaceRaised,borderRadius:2,padding:'3px 6px',flexShrink:0,marginTop:1,letterSpacing:'0.08em'}}>Q{i+1}</div>
-            <textarea value={q.text} onChange={e=>updateQ(q.id,{text:e.target.value})} placeholder="Question text..." style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:12,fontFamily:font,resize:'none',outline:'none',minHeight:32}}/>
-            <button onClick={()=>updateTrial({...trial,questions:trial.questions.filter(x=>x.id!==q.id)})} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:13,lineHeight:1,flexShrink:0}}>✕</button>
+        <div key={q.id} className="question-card" style={{'--q-accent':q.answer==='true'?'var(--green)':q.answer==='false'?'var(--red)':'var(--border)'}}>
+          <div className="question-card__head">
+            <div className="question-card__num" style={{'--q-num-color':q.answer==='true'?'var(--green)':q.answer==='false'?'var(--red)':'var(--text-muted)'}}>Q{i+1}</div>
+            <textarea value={q.text} onChange={e=>updateQ(q.id,{text:e.target.value})} placeholder="Question text..." className="question-card__textarea"/>
+            <button onClick={()=>updateTrial({...trial,questions:trial.questions.filter(x=>x.id!==q.id)})} className="question-card__remove">✕</button>
           </div>
-          <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:8}}>
+          <div className="question-card__answers">
             {['true','false'].map(ans=>(
-              <button key={ans} onClick={()=>updateQ(q.id,{answer:q.answer===ans?null:ans})} style={{padding:'4px 18px',borderRadius:20,fontSize:11,fontFamily:font,cursor:'pointer',fontWeight:q.answer===ans?700:400,background:q.answer===ans?(ans==='true'?C.green:'#660000'):C.surfaceRaised,color:q.answer===ans?'#fff':C.textDim,border:`1px solid ${q.answer===ans?(ans==='true'?C.green:C.red):C.border}`,transition:'all 0.12s',letterSpacing:'0.06em',textTransform:'uppercase'}}>
+              <button key={ans} onClick={()=>updateQ(q.id,{answer:q.answer===ans?null:ans})} className={`answer-pill ${q.answer===ans?(ans==='true'?'answer-pill--true-active':'answer-pill--false-active'):''}`}>
                 {ans==='true'?'TRUE':'FALSE'}
               </button>
             ))}
-            {q.answer&&<span style={{fontSize:10,color:q.answer==='true'?C.green:C.red,fontWeight:700,marginLeft:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>{q.answer==='true'?'✓ True':'✗ False'}</span>}
+            {q.answer&&<span className="question-card__answer-tag" style={{color:q.answer==='true'?'var(--green)':'var(--red)'}}>{q.answer==='true'?'✓ True':'✗ False'}</span>}
           </div>
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            <span style={{fontSize:10,color:C.textMuted,flexShrink:0,fontWeight:700}}>→</span>
+          <div className="question-card__result-row">
+            <span className="question-card__arrow">→</span>
             <Inp value={q.result} onChange={v=>updateQ(q.id,{result:v})} placeholder="Outcome / result..." style={{fontSize:11,padding:'5px 10px'}}/>
           </div>
         </div>
@@ -734,40 +666,31 @@ function TrialModal({session,onUpdate,onClose}){
       <Hr/>
       <Lbl>Result</Lbl>
       <div style={{display:'flex',gap:8,marginBottom:10}}>
-        <Btn variant={trial.result==='correct'?'success':'default'} onClick={()=>updateTrial({...trial,result:'correct'})} style={{flex:1,justifyContent:'center',fontWeight:700,letterSpacing:'0.04em'}}>✓ CORRECT</Btn>
-        <Btn variant={trial.result==='wrong'?'danger':'default'} onClick={()=>updateTrial({...trial,result:'wrong'})} style={{flex:1,justifyContent:'center',fontWeight:700,letterSpacing:'0.04em'}}>✕ WRONG</Btn>
+        <Btn variant={trial.result==='correct'?'success':'default'} full onClick={()=>updateTrial({...trial,result:'correct'})} style={{fontWeight:700,letterSpacing:'0.04em'}}>✓ CORRECT</Btn>
+        <Btn variant={trial.result==='wrong'?'danger':'default'} full onClick={()=>updateTrial({...trial,result:'wrong'})} style={{fontWeight:700,letterSpacing:'0.04em'}}>✕ WRONG</Btn>
       </div>
-      {/* LUCK GAME */}
       {trial.result==='wrong'&&(
-        <div style={{marginBottom:10,background:'#1A0000',border:`1px solid ${C.red}`,borderTop:`2px solid ${C.red}`,borderRadius:R,padding:14}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.red,marginBottom:4,textTransform:'uppercase',letterSpacing:'0.12em'}}>☠ LUCK GAME</div>
-          <div style={{fontSize:11,color:C.textDim,marginBottom:10}}>Trial failed — optionally select a player to eliminate:</div>
+        <div className="luck-game">
+          <div className="luck-game__title">☠ LUCK GAME</div>
+          <div className="luck-game__desc">Trial failed — optionally select a player to eliminate:</div>
           {!luckTarget?(
-            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {alivePlayers.map(p=>(
-                <button key={p.id} onClick={()=>setLuckTarget(p)} style={{padding:'6px 12px',borderRadius:R,fontSize:11,fontFamily:font,cursor:'pointer',background:C.surfaceRaised,color:C.text,border:`1px solid ${C.border}`,fontWeight:600}}>
-                  {p.name}
-                </button>
-              ))}
+            <div className="luck-game__options">
+              {alivePlayers.map(p=><button key={p.id} onClick={()=>setLuckTarget(p)} className="luck-game__option">{p.name}</button>)}
             </div>
           ):(
-            <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:`${C.red}22`,border:`1px solid ${C.red}`,borderRadius:R}}>
-              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>Eliminate <span style={{color:C.red}}>{luckTarget.name}</span>?</div><div style={{fontSize:10,color:C.textDim}}>They will be moved to the dead section when you complete the trial</div></div>
+            <div className="luck-game__confirm">
+              <div className="luck-game__confirm-text"><div style={{fontSize:12,fontWeight:700}}>Eliminate <span style={{color:'var(--red)'}}>{luckTarget.name}</span>?</div><div style={{fontSize:10,color:'var(--text-dim)'}}>They will be moved to the dead section when you complete the trial</div></div>
               <Btn variant="ghost" small onClick={()=>setLuckTarget(null)}>Back</Btn>
             </div>
           )}
         </div>
       )}
-      {/* COMPLETE TRIAL */}
-      <Btn variant="primary" disabled={!trial.result} onClick={()=>onClose(trial.result,luckTarget?.id||null,true)}
-        style={{width:'100%',justifyContent:'center',fontWeight:800,letterSpacing:'0.06em',fontSize:14,padding:'12px 18px'}}>
+      <Btn variant="primary" full disabled={!trial.result} onClick={()=>onClose(trial.result,luckTarget?.id||null,true)} style={{fontWeight:800,letterSpacing:'0.06em',fontSize:14,padding:'12px 18px'}}>
         ✓ COMPLETE TRIAL{luckTarget?` — ELIMINATE ${luckTarget.name.toUpperCase()}`:''}
       </Btn>
-      {!trial.result&&<div style={{fontSize:10,color:C.textMuted,textAlign:'center',marginTop:6,textTransform:'uppercase',letterSpacing:'0.06em'}}>Choose Correct or Wrong to complete the trial</div>}
+      {!trial.result&&<div className="complete-trial-hint">Choose Correct or Wrong to complete the trial</div>}
       <div style={{textAlign:'center',marginTop:10}}>
-        <button onClick={()=>onClose(trial.result,null,false)} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:10,fontFamily:font,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:600}}>
-          Save &amp; close without finishing
-        </button>
+        <button onClick={()=>onClose(trial.result,null,false)} className="save-close-link">Save &amp; close without finishing</button>
       </div>
     </Modal>
   );
@@ -782,7 +705,7 @@ function AddPlayerModal({teams,onAdd,onClose}){
       <Fld label="Name"><Inp value={p.name} onChange={v=>setP(x=>({...x,name:v}))} placeholder="Name" onKeyDown={e=>e.key==='Enter'&&add()}/></Fld>
       <Fld label="Team"><SelEl value={p.team} onChange={v=>setP(x=>({...x,team:v}))} options={teams}/></Fld>
       <Fld label="Class"><Inp value={p.role} onChange={v=>setP(x=>({...x,role:v}))} placeholder="Class (optional)" onKeyDown={e=>e.key==='Enter'&&add()}/></Fld>
-      <div style={{display:'flex',gap:8}}><Btn variant="primary" onClick={add} disabled={!p.name.trim()} style={{flex:1,justifyContent:'center'}}>Add</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
+      <div style={{display:'flex',gap:8}}><Btn variant="primary" full onClick={add} disabled={!p.name.trim()}>Add</Btn><Btn variant="ghost" onClick={onClose}>Cancel</Btn></div>
     </Modal>
   );
 }
@@ -803,23 +726,22 @@ function ReportsModal({session,onClose}){
     ,...(session.deaths.length>0?[`Deaths (${session.deaths.length}):`, ...session.deaths.map(d=>`• Cycle ${d.cycle}: ${pName(d.victimId)} was killed${d.killerId?` by ${pName(d.killerId)}`:''} — ${d.weapon||'?'} at ${d.location||'?'}${d.witnessIds.length?` (${d.witnessIds.length} witness(es))`:''}${d.accompliceId?` [accomplice: ${pName(d.accompliceId)}]`:''}`),'']:[])
     ,`In conclusion, [write final conclusions].`,'',`Final Report,`,`${session.hostName||'?'}, ${date}`].join('\n');
   const copy=(text,key)=>{navigator.clipboard?.writeText(text).then(()=>{setCopied(key);setTimeout(()=>setCopied(''),2000);});};
-  const textStyle={background:C.surfaceRaised,border:`1px solid ${C.border}`,borderRadius:R,padding:12,marginBottom:12,fontSize:10,color:C.textDim,whiteSpace:'pre-wrap',fontFamily:MONO_FONT,maxHeight:240,overflow:'auto',lineHeight:1.6};
   return(
     <Modal title="Reports" onClose={onClose} wide>
-      <div style={{display:'flex',gap:0,marginBottom:14,border:`1px solid ${C.border}`,borderRadius:R,overflow:'hidden'}}>
+      <div className="report-tabs">
         {[['results','Results'],['report','Host Report']].map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'8px 10px',background:tab===k?C.red:C.surface,color:tab===k?'#fff':C.textDim,border:'none',cursor:'pointer',fontFamily:font,fontSize:11,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase'}}>{l}</button>
+          <button key={k} onClick={()=>setTab(k)} className="report-tab" style={{'--tab-bg':tab===k?'var(--red)':'var(--surface)','--tab-color':tab===k?'#fff':'var(--text-dim)'}}>{l}</button>
         ))}
       </div>
       {tab==='results'&&<>
         <Fld label="Winning Team"><SelEl value={winTeam} onChange={setWinTeam} options={[{value:'',label:'— TBD'},...rs.teams]}/></Fld>
-        <Fld label="Highlights"><textarea value={highlights} onChange={e=>setHighlights(e.target.value)} placeholder="Memorable moments, match highlights..." style={{background:C.surfaceRaised,border:`1px solid ${C.border}`,color:C.text,borderRadius:R,padding:'8px 12px',fontSize:12,fontFamily:font,outline:'none',width:'100%',boxSizing:'border-box',minHeight:70,resize:'vertical'}}/></Fld>
-        <div style={textStyle}>{resultsText}</div>
-        <Btn variant="primary" onClick={()=>copy(resultsText,'results')} style={{width:'100%',justifyContent:'center',fontWeight:700}}>{copied==='results'?'✓ Copied!':'Copy to Discord'}</Btn>
+        <Fld label="Highlights"><textarea value={highlights} onChange={e=>setHighlights(e.target.value)} placeholder="Memorable moments, match highlights..." className="textarea"/></Fld>
+        <div className="report-text">{resultsText}</div>
+        <Btn variant="primary" full onClick={()=>copy(resultsText,'results')} style={{fontWeight:700}}>{copied==='results'?'✓ Copied!':'Copy to Discord'}</Btn>
       </>}
       {tab==='report'&&<>
-        <div style={textStyle}>{reportText}</div>
-        <Btn variant="primary" onClick={()=>copy(reportText,'report')} style={{width:'100%',justifyContent:'center',fontWeight:700}}>{copied==='report'?'✓ Copied!':'Copy Report'}</Btn>
+        <div className="report-text">{reportText}</div>
+        <Btn variant="primary" full onClick={()=>copy(reportText,'report')} style={{fontWeight:700}}>{copied==='report'?'✓ Copied!':'Copy Report'}</Btn>
       </>}
     </Modal>
   );
@@ -843,11 +765,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
   const closeTrial=(result,killedId,forceClose)=>{
     let updated={...session};
     const finalized=forceClose||result==='correct'||!!killedId;
-    if(finalized){
-      updated.currentTrial=null;
-    }else if(session.currentTrial){
-      updated.currentTrial={...session.currentTrial,result};
-    }
+    if(finalized){updated.currentTrial=null;}else if(session.currentTrial){updated.currentTrial={...session.currentTrial,result};}
     if(killedId){const death=newDeath({victimId:killedId,killerId:null,weapon:'Luck Game',location:'Trial',cycle:session.currentCycle});updated.deaths=[...updated.deaths,death];updated.players=updated.players.map(p=>p.id===killedId?{...p,alive:false}:p);}
     onUpdate(updated);setModal(null);
   };
@@ -856,63 +774,58 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
   const removePlayer=id=>onUpdate({...session,players:session.players.filter(p=>p.id!==id)});
   const isDay=session.currentPhase==='Day';
   const dayNumber=Math.ceil(session.currentCycle/2);
-  const MBtn=({children,onClick,danger})=><button onClick={onClick} style={{background:'none',border:'none',color:danger?C.red:C.text,padding:'9px 14px',width:'100%',textAlign:'left',cursor:'pointer',fontFamily:font,fontSize:12,borderRadius:R,fontWeight:600,letterSpacing:'0.02em'}}>{children}</button>;
+  const MBtn=({children,onClick,danger})=><button onClick={onClick} className={`dropdown__item ${danger?'dropdown__item--danger':''}`}>{children}</button>;
   return(
-    <div style={{display:'flex',flexDirection:'column',height:'100vh',background:C.bg,fontFamily:font,color:C.text,overflow:'hidden'}}>
-      {/* HEADER */}
-      <div style={{display:'flex',alignItems:'center',padding:'10px 14px',background:C.surface,borderBottom:`1px solid ${C.border}`,gap:10,flexShrink:0}}>
-        <button onClick={onBack} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:14,padding:4}}>←</button>
-        <div style={{fontFamily:'Georgia,"Palatino Linotype",serif',fontSize:16,letterSpacing:'0.12em',fontWeight:900,background:`linear-gradient(to right,${C.white} 50%,${C.red} 50%)`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>DOSSIER</div>
-        <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-          <span style={{padding:'5px 16px',borderRadius:2,fontSize:15,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',background:isDay?'transparent':C.red,color:C.white,border:`2px solid ${isDay?C.white:C.red}`,fontFamily:MONO_FONT}}>
+    <div className="game">
+      <div className="game__header">
+        <button onClick={onBack} className="game__back">←</button>
+        <div className="game__logo">DOSSIER</div>
+        <div className="game__cycle-wrap">
+          <span className="game__cycle-badge" style={{'--cycle-bg':isDay?'transparent':'var(--red)','--cycle-border':isDay?'var(--white)':'var(--red)'}}>
             {isDay?'☀':'☾'} {isDay?'DAY':'NIGHT'} {dayNumber}
           </span>
         </div>
-        {hasExpiredEffects&&<div style={{fontSize:9,color:C.red,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase'}}>⚠ effects</div>}
-        <button onClick={()=>{setShowMenu(s=>!s);setConfirmEnd(false);}} style={{background:'none',border:'none',color:C.textDim,cursor:'pointer',fontSize:20,lineHeight:1,padding:4}}>⋮</button>
+        {hasExpiredEffects&&<div className="game__warning">⚠ effects</div>}
+        <button onClick={()=>{setShowMenu(s=>!s);setConfirmEnd(false);}} className="game__menu-btn">⋮</button>
       </div>
-      {/* TIMERS */}
-      <div style={{display:'flex',gap:6,padding:'7px 10px',background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0,overflowX:'auto'}}>
+      <div className="timers-row">
         <TimerWidget id="invest" label="Investigation" durMin={rs.gameNumbers.investigationDuration} T={T}/>
         <TimerWidget id="trial"  label="Trial"         durMin={rs.gameNumbers.trialDuration}         T={T}/>
         <TimerWidget id="rage"   label="Rage"          durMin={rs.gameNumbers.rageDuration}          T={T}/>
         <TimerWidget id="final"  label="Final Trial"   durMin={rs.gameNumbers.finalTrialDuration}    T={T}/>
       </div>
-      {/* STATS */}
-      <div style={{display:'flex',gap:14,padding:'6px 14px',borderBottom:`1px solid ${C.border}`,fontSize:11,flexShrink:0,alignItems:'center',background:C.surfaceRaised}}>
-        <span style={{color:C.green,fontWeight:700}}>{alive.length} ALIVE</span>
-        <span style={{color:C.textMuted}}>◆</span>
-        <span style={{color:C.red,fontWeight:700}}>{dead.length} DEAD</span>
-        <span style={{color:C.textMuted}}>◆</span>
-        <span style={{color:C.textDim}}>{session.players.length} TOTAL</span>
-        {session.deaths.length>0&&<><span style={{color:C.textMuted}}>◆</span><span style={{color:C.textMuted,fontWeight:600}}>{session.deaths.length} death{session.deaths.length!==1?'s':''}</span></>}
-        {session.currentTrial&&<span style={{color:C.red,marginLeft:'auto',fontWeight:700,fontSize:10,letterSpacing:'0.1em'}}>● TRIAL ACTIVE</span>}
+      <div className="stats-bar">
+        <span className="stats-bar__alive">{alive.length} ALIVE</span>
+        <span className="stats-bar__dim">◆</span>
+        <span className="stats-bar__dead">{dead.length} DEAD</span>
+        <span className="stats-bar__dim">◆</span>
+        <span className="stats-bar__total">{session.players.length} TOTAL</span>
+        {session.deaths.length>0&&<><span className="stats-bar__dim">◆</span><span className="stats-bar__deaths">{session.deaths.length} death{session.deaths.length!==1?'s':''}</span></>}
+        {session.currentTrial&&<span className="stats-bar__trial">● TRIAL ACTIVE</span>}
       </div>
-      {/* SCROLLABLE */}
-      <div style={{flex:1,overflow:'auto'}}>
+      <div className="scroll-area">
         {alive.length>0?(
-          <div style={{padding:8,display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))',gap:6,alignContent:'start'}}>
+          <div className="player-grid">
             {alive.map(p=><PlayerCard key={p.id} player={p} currentCycle={session.currentCycle} onClick={()=>setModal({type:'player',id:p.id})}/>)}
           </div>
         ):(
-          <div style={{color:C.textDim,textAlign:'center',padding:30,fontSize:12,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>No alive players · use ⋮ to add</div>
+          <div className="empty-state">No alive players · use ⋮ to add</div>
         )}
-        {/* DEAD SECTION */}
         {dead.length>0&&(
-          <div style={{borderTop:`1px solid ${C.border}`}}>
-            <button onClick={()=>setDeadExpanded(s=>!s)} style={{width:'100%',background:C.surfaceRaised,border:'none',borderBottom:deadExpanded?`1px solid ${C.border}`:'none',padding:'8px 14px',display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontFamily:font}}>
-              <div style={{width:6,height:6,borderRadius:1,background:C.red,flexShrink:0,transform:'rotate(45deg)'}}/>
-              <span style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.14em',color:C.red}}>Dead ({dead.length})</span>
-              <span style={{marginLeft:'auto',fontSize:11,color:C.textMuted}}>{deadExpanded?'▲':'▼'}</span>
+          <div className="dead-section">
+            <button onClick={()=>setDeadExpanded(s=>!s)} className={`dead-toggle ${deadExpanded?'dead-toggle--open':''}`}>
+              <div className="dead-toggle__diamond"/>
+              <span className="dead-toggle__label">Dead ({dead.length})</span>
+              <span className="dead-toggle__chevron">{deadExpanded?'▲':'▼'}</span>
             </button>
             {deadExpanded&&(
-              <div style={{padding:8,display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))',gap:6,alignContent:'start'}}>
+              <div className="player-grid">
                 {dead.map(p=>(
-                  <div key={p.id} style={{display:'flex',flexDirection:'column'}}>
+                  <div key={p.id}>
                     <PlayerCard player={p} currentCycle={session.currentCycle} onClick={()=>setModal({type:'player',id:p.id})}/>
-                    <div style={{display:'flex',gap:5,marginTop:5}}>
-                      <Btn small variant="success" onClick={()=>revivePlayer(p.id)} style={{flex:1,justifyContent:'center'}}>Revive</Btn>
-                      <Btn small variant="ghost" onClick={()=>removePlayer(p.id)} style={{flex:1,justifyContent:'center',color:C.red,borderColor:`${C.red}55`}}>Remove</Btn>
+                    <div className="dead-action-row">
+                      <Btn small variant="success" full onClick={()=>revivePlayer(p.id)}>Revive</Btn>
+                      <Btn small variant="ghost" full onClick={()=>removePlayer(p.id)} style={{color:'var(--red)',borderColor:'rgba(204,0,0,0.33)'}}>Remove</Btn>
                     </div>
                   </div>
                 ))}
@@ -921,24 +834,22 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
           </div>
         )}
       </div>
-      {/* BOTTOM BAR */}
-      <div style={{display:'flex',gap:6,padding:'7px 10px',background:C.surface,borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-        <Btn onClick={()=>setModal({type:'death'})} variant="danger" style={{flex:1,justifyContent:'center',fontWeight:700,letterSpacing:'0.04em'}}>☠ DEATH</Btn>
-        <Btn onClick={()=>setModal({type:'trial'})} variant={session.currentTrial?'primary':'default'} style={{flex:1,justifyContent:'center',fontWeight:700,letterSpacing:'0.04em'}}>{session.currentTrial?'⚖ TRIAL':'⚖ TRIAL'}</Btn>
-        <Btn onClick={advance} style={{flex:1,justifyContent:'center',fontWeight:700,letterSpacing:'0.04em',background:isDay?C.redDim:C.surfaceRaised,color:isDay?C.red:C.text,border:`1px solid ${isDay?C.red:C.border}`}}>{isDay?'☾ NIGHT →':'☀ DAY →'}</Btn>
+      <div className="bottom-bar">
+        <Btn onClick={()=>setModal({type:'death'})} variant="danger" full style={{fontWeight:700,letterSpacing:'0.04em'}}>☠ DEATH</Btn>
+        <Btn onClick={()=>setModal({type:'trial'})} variant={session.currentTrial?'primary':'default'} full style={{fontWeight:700,letterSpacing:'0.04em'}}>⚖ TRIAL</Btn>
+        <Btn onClick={advance} full className="bottom-bar__advance" style={{'--advance-bg':isDay?'var(--red-dim)':'var(--surface-raised)','--advance-color':isDay?'var(--red)':'var(--text)','--advance-border':isDay?'var(--red)':'var(--border)',fontWeight:700,letterSpacing:'0.04em'}}>{isDay?'☾ NIGHT →':'☀ DAY →'}</Btn>
       </div>
-      {/* DROPDOWN */}
       {showMenu&&<>
-        <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>{setShowMenu(false);setConfirmEnd(false);}}/>
-        <div style={{position:'fixed',top:50,right:8,background:C.surface,border:`1px solid ${C.borderBright}`,borderTop:`2px solid ${C.red}`,borderRadius:R,zIndex:200,minWidth:180,padding:4}}>
+        <div className="dropdown-overlay" onClick={()=>{setShowMenu(false);setConfirmEnd(false);}}/>
+        <div className="dropdown">
           <MBtn onClick={()=>{setModal({type:'addPlayer'});setShowMenu(false);}}>Add Player</MBtn>
           <MBtn onClick={()=>{setModal({type:'reports'});setShowMenu(false);}}>Reports</MBtn>
           {session.currentTrial&&<MBtn onClick={()=>{dismissTrial();setShowMenu(false);}}>Dismiss Active Trial</MBtn>}
-          <div style={{height:1,background:C.border,margin:'4px 8px'}}/>
+          <div className="hr" style={{margin:'4px 8px'}}/>
           {!confirmEnd?<MBtn danger onClick={e=>{e.stopPropagation();setConfirmEnd(true);}}>End Game</MBtn>:(
-            <div style={{padding:'6px 10px'}} onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:11,color:C.red,marginBottom:7,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em'}}>End current session?</div>
-              <div style={{display:'flex',gap:6}}>
+            <div className="dropdown__confirm" onClick={e=>e.stopPropagation()}>
+              <div className="dropdown__confirm-text">End current session?</div>
+              <div className="dropdown__confirm-actions">
                 <Btn small variant="primary" onClick={()=>{onEndGame();setShowMenu(false);setConfirmEnd(false);}}>Yes, end it</Btn>
                 <Btn small variant="ghost" onClick={()=>setConfirmEnd(false)}>No</Btn>
               </div>
@@ -946,7 +857,6 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
           )}
         </div>
       </>}
-      {/* MODALS */}
       {modal?.type==='player'&&getP(modal.id)&&<PlayerModal player={getP(modal.id)} session={session} onUpdate={updatePlayer} onRemove={()=>{removePlayer(modal.id);setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type==='death'&&<DeathModal session={session} onConfirm={registerDeath} onClose={()=>setModal(null)}/>}
       {modal?.type==='trial'&&<TrialModal session={session} onUpdate={updateTrial} onClose={closeTrial}/>}
@@ -968,7 +878,7 @@ function App(){
   const save=useCallback(async sess=>{const s={...sess,lastModified:Date.now()};setSession(s);await db.set('session',s,true);return s;},[]);
   const startSession=async(rs,meta,players)=>{const sess=newSession(rs,meta.hostName,meta.coHostName,meta.mapName);sess.players=players;await save(sess);const idx=rulesets.findIndex(r=>r.id===rs.id);const updRs=idx>=0?rulesets.map((r,i)=>i===idx?rs:r):[...rulesets,rs];setRulesets(updRs);await db.set('rulesets',updRs);const names=new Set(players.map(p=>p.name.toLowerCase()));const filtered=recentPlayers.filter(r=>!names.has(r.name.toLowerCase()));const newRecent=[...players.map(p=>({name:p.name,team:p.team,role:p.role})),...filtered].slice(0,30);setRecentPlayers(newRecent);await db.set('recent_players',newRecent);setScreen('game');};
   const endSession=async()=>{if(session)await save({...session,endedAt:Date.now()});await db.del('session',true);setSession(null);setScreen('home');};
-  if(screen==='loading')return<div style={{height:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.red,fontFamily:MONO_FONT,fontSize:13,letterSpacing:'0.2em',fontWeight:700}}>LOADING…</div>;
+  if(screen==='loading')return<div style={{height:'100vh',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--red)',fontFamily:'var(--font-mono)',fontSize:13,letterSpacing:'0.2em',fontWeight:700}}>LOADING…</div>;
   if(screen==='home')return<HomeScreen session={session} onNew={()=>setScreen('setup')} onContinue={()=>setScreen('game')} onClear={endSession}/>;
   if(screen==='setup')return<SetupScreen rulesets={rulesets} recentPlayers={recentPlayers} onComplete={startSession} onBack={()=>setScreen('home')}/>;
   if(screen==='game'&&session)return<GameScreen session={session} onUpdate={save} onEndGame={endSession} onBack={()=>setScreen('home')} T={T}/>;
