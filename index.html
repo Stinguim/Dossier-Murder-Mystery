@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DOSSIER — Murder Mystery Companion</title>
+<link rel="icon" type="image/png" href="assets/monokuma.png">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -62,7 +63,7 @@ const calcVotes=(trial,players)=>{const out={};Object.entries(trial.votes).forEa
 // ═══ TIMER HOOK ═══
 function useTimers(){
   const[ts,setTs]=useState({});const ref=useRef();
-  useEffect(()=>{const tick=()=>{setTs(prev=>{let ch=false;const next={};for(const[k,t]of Object.entries(prev)){if(t.running){const e=Date.now()-t.startedAt;next[k]={...t,elapsed:e};if(e!==t.elapsed)ch=true;}else next[k]=t;}return ch?next:prev;});ref.current=setTimeout(tick,300);};ref.current=setTimeout(tick,300);return()=>clearTimeout(ref.current);},[]);
+  useEffect(()=>{const tick=()=>{setTs(prev=>{let ch=false;const next={};for(const[k,t]of Object.entries(prev)){if(t.running){const e=Date.now()-t.startedAt;next[k]={...t,elapsed:e};if(e!==t.elapsed)ch=true;}else next[k]=t;}return ch?next:prev;});ref.current=setTimeout(tick,1000);};ref.current=setTimeout(tick,1000);return()=>clearTimeout(ref.current);},[]);
   const start=(k,ms)=>setTs(p=>({...p,[k]:{startedAt:Date.now(),durationMs:ms,elapsed:0,running:true}}));
   const pause=k=>setTs(p=>p[k]?{...p,[k]:{...p[k],running:false}}:p);
   const resume=k=>setTs(p=>p[k]?{...p,[k]:{...p[k],startedAt:Date.now()-p[k].elapsed,running:true}}:p);
@@ -73,12 +74,14 @@ function useTimers(){
 }
 
 // ═══ LOGO IMAGE ═══
-// Swap this path to your own image. Falls back to a text mark if missing.
+// Swap this path to your own image. Falls back to a text mark if missing —
+// the app never looks broken even before you've added the real file.
 const LOGO_SRC = 'assets/monokuma.png';
-function LogoImage({size}){
+function LogoImage({variant='home'}){
   const[err,setErr]=useState(false);
-  if(err) return <div className="mono" style={{fontSize:size?40:28,fontWeight:900,color:'var(--red)',textAlign:'center'}}>⚈⚆</div>;
-  return <img src={LOGO_SRC} alt="" className="home__logo-img" onError={()=>setErr(true)}/>;
+  const cls = variant==='header' ? 'header-logo-img' : 'home__logo-img';
+  if(err) return <div className={`mono ${variant==='header'?'header-logo-fallback':''}`} style={variant==='header'?{}:{fontSize:40,fontWeight:900,color:'var(--red)',textAlign:'center'}}>⚈⚆</div>;
+  return <img src={LOGO_SRC} alt="" className={cls} onError={()=>setErr(true)} loading="eager" decoding="async"/>;
 }
 
 // ═══ PRIMITIVES ═══
@@ -145,8 +148,27 @@ function TimerWidget({id,label,durMin,T}){
   );
 }
 
+// Self-contained: owns its own ticking state, so the 1s tick only ever
+// re-renders this small subtree — never the player grid, modals, or the
+// rest of GameScreen. Important for VR where every spare cycle matters.
+function TimersPanel({gameNumbers}){
+  const T=useTimers();
+  return(
+    <div className="timers-row">
+      <TimerWidget id="invest" label="Investigation" durMin={gameNumbers.investigationDuration} T={T}/>
+      <TimerWidget id="trial"  label="Trial"         durMin={gameNumbers.trialDuration}         T={T}/>
+      <TimerWidget id="rage"   label="Rage"          durMin={gameNumbers.rageDuration}          T={T}/>
+      <TimerWidget id="final"  label="Final Trial"   durMin={gameNumbers.finalTrialDuration}    T={T}/>
+    </div>
+  );
+}
+
 // ═══ PLAYER CARD ═══
-function PlayerCard({player,currentCycle,onClick}){
+// Memoized: re-renders only when this specific player's data or the current
+// cycle changes — not when a sibling card, modal, or menu toggles. The
+// onClick closure is intentionally excluded from the comparison since it's
+// functionally identical across renders (same player id).
+const PlayerCard=React.memo(function PlayerCard({player,currentCycle,onClick}){
   const tc=teamColor(player.team);const tcText=teamColorText(player.team);const alive=player.alive;
   const effects=player.effects.filter(e=>!e.manuallyExpired);
   const voteWeight=player.voteWeight||1;
@@ -168,7 +190,7 @@ function PlayerCard({player,currentCycle,onClick}){
       )}
     </div>
   );
-}
+},(prev,next)=>prev.player===next.player&&prev.currentCycle===next.currentCycle);
 
 // ═══ HOME SCREEN ═══
 function HomeScreen({session,onNew,onContinue,onClear}){
@@ -177,7 +199,7 @@ function HomeScreen({session,onNew,onContinue,onClear}){
       <div className="home__bg-texture"/>
       <div className="home__header">
         <div className="home__eyebrow">◆ Murder Mystery VRChat ◆</div>
-        <LogoImage size/>
+        <LogoImage variant="home"/>
         <h1 className="home__title">DOSSIER</h1>
         <div className="home__divider-row">
           <div className="home__divider-line"/>
@@ -239,6 +261,7 @@ function SetupScreen({rulesets,recentPlayers,lastHostInfo,onComplete,onBack}){
     <div className="setup">
       <div className="setup__header">
         <button onClick={onBack} className="setup__back">←</button>
+        <LogoImage variant="header"/>
         <div className="setup__title">New Session</div>
         <div className="setup__header-actions">
           {step>0&&<Btn variant="ghost" small onClick={()=>setStep(s=>s-1)}>Back</Btn>}
@@ -759,7 +782,7 @@ function ReportsModal({session,onClose}){
 }
 
 // ═══ GAME SCREEN ═══
-function GameScreen({session,onUpdate,onEndGame,onBack,T}){
+function GameScreen({session,onUpdate,onEndGame,onBack}){
   const[modal,setModal]=useState(null);
   const[showMenu,setShowMenu]=useState(false);
   const[confirmEnd,setConfirmEnd]=useState(false);
@@ -790,6 +813,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
     <div className="game">
       <div className="game__header">
         <button onClick={onBack} className="game__back">←</button>
+        <LogoImage variant="header"/>
         <div className="game__logo">DOSSIER</div>
         <div className="game__cycle-wrap">
           <span className="game__cycle-badge" style={{'--cycle-bg':isDay?'transparent':'var(--red)','--cycle-border':isDay?'var(--white)':'var(--red)'}}>
@@ -799,12 +823,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack,T}){
         {hasExpiredEffects&&<div className="game__warning">⚠ effects</div>}
         <button onClick={()=>{setShowMenu(s=>!s);setConfirmEnd(false);}} className="game__menu-btn">⋮</button>
       </div>
-      <div className="timers-row">
-        <TimerWidget id="invest" label="Investigation" durMin={rs.gameNumbers.investigationDuration} T={T}/>
-        <TimerWidget id="trial"  label="Trial"         durMin={rs.gameNumbers.trialDuration}         T={T}/>
-        <TimerWidget id="rage"   label="Rage"          durMin={rs.gameNumbers.rageDuration}          T={T}/>
-        <TimerWidget id="final"  label="Final Trial"   durMin={rs.gameNumbers.finalTrialDuration}    T={T}/>
-      </div>
+      <TimersPanel gameNumbers={rs.gameNumbers}/>
       <div className="stats-bar">
         <span className="stats-bar__alive">{alive.length} ALIVE</span>
         <span className="stats-bar__dim">◆</span>
@@ -884,7 +903,7 @@ function App(){
   const[rulesets,setRulesets]=useState([]);
   const[recentPlayers,setRecentPlayers]=useState([]);
   const[lastHostInfo,setLastHostInfo]=useState(null);
-  const T=useTimers();const pollRef=useRef();
+  const pollRef=useRef();
   useEffect(()=>{(async()=>{let rs=await db.get('rulesets');if(!rs?.length){rs=[newRuleset()];await db.set('rulesets',rs);}setRulesets(rs);const recent=await db.get('recent_players')||[];setRecentPlayers(recent);const hostInfo=await db.get('host_info');if(hostInfo)setLastHostInfo(hostInfo);const sess=await db.get('session',true);if(sess){setSession(sess);setScreen('game');}else setScreen('home');})();},[]);
   useEffect(()=>{if(screen!=='game'){clearInterval(pollRef.current);return;}pollRef.current=setInterval(async()=>{const remote=await db.get('session',true);if(remote&&remote.lastModified>(session?.lastModified||0))setSession(remote);},5000);return()=>clearInterval(pollRef.current);},[screen,session?.lastModified]);
   const save=useCallback(async sess=>{const s={...sess,lastModified:Date.now()};setSession(s);await db.set('session',s,true);return s;},[]);
@@ -893,7 +912,7 @@ function App(){
   if(screen==='loading')return<div style={{height:'100vh',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--red)',fontFamily:'var(--font-mono)',fontSize:13,letterSpacing:'0.2em',fontWeight:700}}>LOADING…</div>;
   if(screen==='home')return<HomeScreen session={session} onNew={()=>setScreen('setup')} onContinue={()=>setScreen('game')} onClear={endSession}/>;
   if(screen==='setup')return<SetupScreen rulesets={rulesets} recentPlayers={recentPlayers} lastHostInfo={lastHostInfo} onComplete={startSession} onBack={()=>setScreen('home')}/>;
-  if(screen==='game'&&session)return<GameScreen session={session} onUpdate={save} onEndGame={endSession} onBack={()=>setScreen('home')} T={T}/>;
+  if(screen==='game'&&session)return<GameScreen session={session} onUpdate={save} onEndGame={endSession} onBack={()=>setScreen('home')}/>;
   return null;
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
