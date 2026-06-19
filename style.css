@@ -52,13 +52,46 @@ input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 button { font-family: var(--font); }
 
-@keyframes flicker {
-  0%, 100% { opacity: 1; }
-  92% { opacity: 1; }
-  93% { opacity: .85; }
-  94% { opacity: 1; }
-  97% { opacity: .9; }
-  98% { opacity: 1; }
+/* ============== PAGE / MODAL TRANSITIONS ==============
+   GPU-cheap by design: only opacity + transform, single run on mount,
+   no continuous animation loop, no blur/filter. Costs nothing once
+   finished — the browser doesn't keep compositing after the animation
+   ends, so this is safe to leave on at all times in VR. */
+@keyframes screenFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalOverlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.home, .setup, .game {
+  animation: screenFadeIn 0.2s ease-out both;
+}
+.modal-overlay { animation: modalOverlayFadeIn 0.12s ease-out both; }
+.modal { animation: modalPopIn 0.16s cubic-bezier(0.2,0.8,0.2,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home, .setup, .game, .modal-overlay, .modal { animation: none; }
+}
+
+/* ============== HEADER LOGO (Setup / Game screens) ============== */
+.header-logo-img {
+  height: 24px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.header-logo-fallback {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--red);
+  flex-shrink: 0;
 }
 
 /* ============== TYPOGRAPHY HELPERS ============== */
