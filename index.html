@@ -48,7 +48,7 @@ const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slic
 const newRuleset=()=>({id:uid(),name:'My Rules',teams:['Mastermind','Despair','Student'],buffLibrary:[],gameNumbers:{investigationDuration:2,trialDuration:10,finalTrialDuration:5,rageDuration:3,autoVoteMultiplier:2}});
 const newSession=(rs,host,cohost,map)=>({id:uid(),rulesetSnapshot:{...rs},currentCycle:1,currentPhase:'Day',players:[],deaths:[],currentTrial:null,hostName:host||'',coHostName:cohost||'',mapName:map||'',startedAt:Date.now(),endedAt:null,winningTeam:null,lastModified:Date.now()});
 const newPlayer=(name,team,role)=>({id:uid(),name,team,role,alive:true,targetId:null,partnerId:null,effects:[],counters:{},notes:'',voteWeight:1});
-const newEffect=(name,type,appliedCycle,durationHours,permanent)=>{const cycles=permanent?null:Math.max(1,Math.round((+durationHours||12)/12));return{id:uid(),name,type,appliedCycle,durationCycles:cycles,expiresOnCycle:permanent?null:appliedCycle+cycles,permanent:!!permanent,manuallyExpired:false};};
+const newEffect=(name,type,appliedCycle,durationHours,permanent,description)=>{const cycles=permanent?null:Math.max(1,Math.round((+durationHours||12)/12));return{id:uid(),name,type,appliedCycle,durationCycles:cycles,expiresOnCycle:permanent?null:appliedCycle+cycles,permanent:!!permanent,manuallyExpired:false,description:description||''};};
 const newDeath=d=>({id:uid(),...d,accompliceId:d.accompliceId||null,witnessIds:d.witnessIds||[]});
 const newTrial=(cycle,mult)=>({id:uid(),cycle,presentPlayerIds:[],votes:{},autoVoteMultiplier:+mult||2,excludedTeams:[],questions:[],accusedId:null,result:null});
 const newQuestion=()=>({id:uid(),text:'',answer:null,result:''});
@@ -211,23 +211,30 @@ function HomeScreen({session,onNew,onContinue,onClear}){
 }
 
 // ═══ SETUP SCREEN ═══
-function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
+function SetupScreen({rulesets,recentPlayers,lastHostInfo,onComplete,onBack}){
   const[step,setStep]=useState(0);
-  const[meta,setMeta]=useState({hostName:'',coHostName:'',mapName:''});
+  const[meta,setMeta]=useState({hostName:lastHostInfo?.hostName||'',coHostName:lastHostInfo?.coHostName||'',mapName:''});
   const[ruleset,setRuleset]=useState(()=>({...rulesets[0]}));
   const[players,setPlayers]=useState([]);
   const[pForm,setPForm]=useState({name:'',team:rulesets[0]?.teams[0]||'',role:''});
   const[teamInput,setTeamInput]=useState(rulesets[0]?.teams.join(', ')||'');
   const[libOpen,setLibOpen]=useState(false);
-  const[libForm,setLibForm]=useState({name:'',type:'buff'});
+  const[libForm,setLibForm]=useState({name:'',type:'buff',description:''});
   const[showRecent,setShowRecent]=useState(false);
   const teams=teamInput.split(',').map(t=>t.trim()).filter(Boolean);
   const addPlayer=()=>{if(!pForm.name.trim())return;setPlayers(p=>[...p,newPlayer(pForm.name.trim(),pForm.team||teams[0]||'',pForm.role.trim())]);setPForm(p=>({...p,name:'',role:''}));};
   const addRecentPlayer=rp=>{if(players.some(p=>p.name.toLowerCase()===rp.name.toLowerCase()))return;setPlayers(p=>[...p,newPlayer(rp.name,rp.team||teams[0]||'',rp.role||'')]);};
-  const addToLib=()=>{if(!libForm.name.trim())return;const item={id:uid(),name:libForm.name.trim(),type:libForm.type};setRuleset(r=>({...r,buffLibrary:[...(r.buffLibrary||[]),item]}));setLibForm({name:'',type:'buff'});};
+  const addToLib=()=>{if(!libForm.name.trim())return;const item={id:uid(),name:libForm.name.trim(),type:libForm.type,description:libForm.description.trim()};setRuleset(r=>({...r,buffLibrary:[...(r.buffLibrary||[]),item]}));setLibForm(f=>({name:'',type:f.type,description:''}));};
   const removeFromLib=id=>setRuleset(r=>({...r,buffLibrary:r.buffLibrary.filter(x=>x.id!==id)}));
   const complete=()=>onComplete({...ruleset,teams},meta,players);
   const steps=['Session','Ruleset','Players'];
+  // Auto-save ruleset edits (teams, game numbers, effect library) as the host types,
+  // so nothing is lost if they back out before starting a game, and next time
+  // Setup opens pre-filled with whatever was last configured.
+  useEffect(()=>{
+    const draft={...ruleset,teams:teams.length?teams:ruleset.teams};
+    db.set('rulesets',[draft,...rulesets.slice(1)],false);
+  },[ruleset,teamInput]);
   return(
     <div className="setup">
       <div className="setup__header">
@@ -273,16 +280,17 @@ function SetupScreen({rulesets,recentPlayers,onComplete,onBack}){
           </div>
           {libOpen&&<div>
             <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:10}}>Define effects available in-game. Duration & permanent are chosen when applying.</div>
-            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:7,marginBottom:10}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:7,marginBottom:7}}>
               <Inp value={libForm.name} onChange={v=>setLibForm(a=>({...a,name:v}))} placeholder="Effect name" onKeyDown={e=>e.key==='Enter'&&addToLib()}/>
               <SelEl value={libForm.type} onChange={v=>setLibForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
               <Btn small variant="primary" onClick={addToLib} disabled={!libForm.name.trim()}>+</Btn>
             </div>
+            <Inp value={libForm.description} onChange={v=>setLibForm(a=>({...a,description:v}))} placeholder="What does it do? (optional)" onKeyDown={e=>e.key==='Enter'&&addToLib()} style={{marginBottom:10,fontSize:12}}/>
             {(ruleset.buffLibrary||[]).length===0&&<div style={{fontSize:11,color:'var(--text-muted)',fontStyle:'italic'}}>No effects defined yet</div>}
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
               {(ruleset.buffLibrary||[]).map(item=>{const e=EFF[effKey(item.type)]||EFF.buff;return(
-                <div key={item.id} className="lib-chip" style={{'--chip-bg':e.bg,'--chip-border':e.accent,'--chip-text':e.text}}>
-                  <span className="lib-chip__label">{item.name}</span>
+                <div key={item.id} className="lib-chip" style={{'--chip-bg':e.bg,'--chip-border':e.accent,'--chip-text':e.text}} title={item.description||undefined}>
+                  <span className="lib-chip__label">{item.name}{item.description&&<span style={{opacity:0.6,marginLeft:3}}>ⓘ</span>}</span>
                   <button onClick={()=>removeFromLib(item.id)} className="lib-chip__remove">✕</button>
                 </div>
               );})}
@@ -345,7 +353,7 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
   const[applyPermanent,setApplyPermanent]=useState(false);
   const[filterType,setFilterType]=useState('todos');
   const[customMode,setCustomMode]=useState(false);
-  const[customForm,setCustomForm]=useState({name:'',type:'buff'});
+  const[customForm,setCustomForm]=useState({name:'',type:'buff',description:''});
   const[rolledItem,setRolledItem]=useState(null);
   const teams=session.rulesetSnapshot.teams;
   const library=session.rulesetSnapshot.buffLibrary||[];
@@ -354,7 +362,7 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
   const pOpts=[{value:'',label:'— None'},...others.map(x=>({value:x.id,label:x.name}))];
   const save=upd=>{setP(upd);onUpdate(upd);};
   const handleClose=()=>{onUpdate(p);onClose();};
-  const applyEffect=(name,type,hours,permanent)=>{const e=newEffect(name,type,cycle,hours,permanent);save({...p,effects:[...p.effects,e]});setSelectedLib(null);setRolledItem(null);setApplyHours(12);setApplyPermanent(false);setCustomMode(false);setCustomForm({name:'',type:'buff'});};
+  const applyEffect=(name,type,hours,permanent,description)=>{const e=newEffect(name,type,cycle,hours,permanent,description);save({...p,effects:[...p.effects,e]});setSelectedLib(null);setRolledItem(null);setApplyHours(12);setApplyPermanent(false);setCustomMode(false);setCustomForm(f=>({name:'',type:f.type,description:''}));};
   const selectLib=item=>{setSelectedLib(item);setRolledItem(null);};
   const rollRandom=()=>{const pool=filterType==='todos'?library:library.filter(e=>e.type===filterType);if(!pool.length)return;const item=pool[Math.floor(Math.random()*pool.length)];setRolledItem(item);setSelectedLib(item);};
   const filteredLib=filterType==='todos'?library:library.filter(e=>e.type===filterType);
@@ -399,7 +407,7 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
       {activeEff.map(e=>{const rem=remIG(e,cycle);const eff=EFF[effKey(e.type)]||EFF.buff;return(
         <div key={e.id} className="applied-effect-row" style={{'--eff-accent':eff.accent}}>
           <Tag type={e.type}>{e.type}</Tag>
-          <div style={{flex:1}}><div className="applied-effect-row__name">{e.name}{e.permanent&&<span className="applied-effect-row__perm">∞</span>}</div><div className="applied-effect-row__meta">{e.permanent?'PERMANENT':rem!==null?`${rem}h IG remaining · exp. cycle ${e.expiresOnCycle}`:''}</div></div>
+          <div style={{flex:1}}><div className="applied-effect-row__name">{e.name}{e.permanent&&<span className="applied-effect-row__perm">∞</span>}</div><div className="applied-effect-row__meta">{e.permanent?'PERMANENT':rem!==null?`${rem}h IG remaining · exp. cycle ${e.expiresOnCycle}`:''}</div>{e.description&&<div style={{fontSize:11,color:'var(--text-dim)',fontStyle:'italic',marginTop:3,lineHeight:1.4}}>{e.description}</div>}</div>
           <Btn small variant="ghost" onClick={()=>save({...p,effects:p.effects.filter(x=>x.id!==e.id)})}>✕</Btn>
         </div>
       );})}
@@ -444,9 +452,10 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
                 <span className="confirm-apply-panel__name">{selectedLib.name}</span>
                 <button onClick={()=>{setSelectedLib(null);setRolledItem(null);}} className="confirm-apply-panel__close">✕</button>
               </div>
+              {selectedLib.description&&<div style={{fontSize:12,color:eff.text,opacity:0.85,fontStyle:'italic',marginBottom:10,lineHeight:1.4}}>{selectedLib.description}</div>}
               <DurRow/>
               {!applyPermanent&&<div className="confirm-apply-panel__meta">{fmtIG(Math.round(applyHours/12))} · expires cycle {cycle+Math.round(applyHours/12)}</div>}
-              <Btn variant="primary" full onClick={()=>applyEffect(selectedLib.name,selectedLib.type,applyHours,applyPermanent)} style={{fontWeight:700,letterSpacing:'0.06em'}}>Apply {selectedLib.name.toUpperCase()}</Btn>
+              <Btn variant="primary" full onClick={()=>applyEffect(selectedLib.name,selectedLib.type,applyHours,applyPermanent,selectedLib.description)} style={{fontWeight:700,letterSpacing:'0.06em'}}>Apply {selectedLib.name.toUpperCase()}</Btn>
             </div>
           );})()}
           {!customMode?<button onClick={()=>setCustomMode(true)} style={{background:'none',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:10,fontFamily:'inherit',padding:'4px 0',marginTop:2,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:700}}>+ Custom effect</button>:(
@@ -456,8 +465,9 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
                 <SelEl value={customForm.type} onChange={v=>setCustomForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
                 <button onClick={()=>setCustomMode(false)} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:15,padding:'0 4px'}}>✕</button>
               </div>
+              <Inp value={customForm.description} onChange={v=>setCustomForm(a=>({...a,description:v}))} placeholder="What does it do? (optional)" style={{marginBottom:8,fontSize:12}}/>
               <DurRow/>
-              <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
+              <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent,customForm.description)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
             </div>
           )}
         </>
@@ -467,8 +477,9 @@ function PlayerModal({player,session,onUpdate,onRemove,onClose}){
             <Inp value={customForm.name} onChange={v=>setCustomForm(a=>({...a,name:v}))} placeholder="Effect name"/>
             <SelEl value={customForm.type} onChange={v=>setCustomForm(a=>({...a,type:v}))} options={['buff','debuff','punishment','perk']}/>
           </div>
+          <Inp value={customForm.description} onChange={v=>setCustomForm(a=>({...a,description:v}))} placeholder="What does it do? (optional)" style={{marginBottom:8,fontSize:12}}/>
           <DurRow/>
-          <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
+          <Btn variant="primary" full onClick={()=>applyEffect(customForm.name.trim(),customForm.type,applyHours,applyPermanent,customForm.description)} disabled={!customForm.name.trim()}>Apply Effect</Btn>
           <div style={{fontSize:9,color:'var(--text-muted)',marginTop:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Tip: define an effect library in setup for 1-tap chips</div>
         </div>
       )}
@@ -872,15 +883,16 @@ function App(){
   const[session,setSession]=useState(null);
   const[rulesets,setRulesets]=useState([]);
   const[recentPlayers,setRecentPlayers]=useState([]);
+  const[lastHostInfo,setLastHostInfo]=useState(null);
   const T=useTimers();const pollRef=useRef();
-  useEffect(()=>{(async()=>{let rs=await db.get('rulesets');if(!rs?.length){rs=[newRuleset()];await db.set('rulesets',rs);}setRulesets(rs);const recent=await db.get('recent_players')||[];setRecentPlayers(recent);const sess=await db.get('session',true);if(sess){setSession(sess);setScreen('game');}else setScreen('home');})();},[]);
+  useEffect(()=>{(async()=>{let rs=await db.get('rulesets');if(!rs?.length){rs=[newRuleset()];await db.set('rulesets',rs);}setRulesets(rs);const recent=await db.get('recent_players')||[];setRecentPlayers(recent);const hostInfo=await db.get('host_info');if(hostInfo)setLastHostInfo(hostInfo);const sess=await db.get('session',true);if(sess){setSession(sess);setScreen('game');}else setScreen('home');})();},[]);
   useEffect(()=>{if(screen!=='game'){clearInterval(pollRef.current);return;}pollRef.current=setInterval(async()=>{const remote=await db.get('session',true);if(remote&&remote.lastModified>(session?.lastModified||0))setSession(remote);},5000);return()=>clearInterval(pollRef.current);},[screen,session?.lastModified]);
   const save=useCallback(async sess=>{const s={...sess,lastModified:Date.now()};setSession(s);await db.set('session',s,true);return s;},[]);
-  const startSession=async(rs,meta,players)=>{const sess=newSession(rs,meta.hostName,meta.coHostName,meta.mapName);sess.players=players;await save(sess);const idx=rulesets.findIndex(r=>r.id===rs.id);const updRs=idx>=0?rulesets.map((r,i)=>i===idx?rs:r):[...rulesets,rs];setRulesets(updRs);await db.set('rulesets',updRs);const names=new Set(players.map(p=>p.name.toLowerCase()));const filtered=recentPlayers.filter(r=>!names.has(r.name.toLowerCase()));const newRecent=[...players.map(p=>({name:p.name,team:p.team,role:p.role})),...filtered].slice(0,30);setRecentPlayers(newRecent);await db.set('recent_players',newRecent);setScreen('game');};
+  const startSession=async(rs,meta,players)=>{const sess=newSession(rs,meta.hostName,meta.coHostName,meta.mapName);sess.players=players;await save(sess);const idx=rulesets.findIndex(r=>r.id===rs.id);const updRs=idx>=0?rulesets.map((r,i)=>i===idx?rs:r):[...rulesets,rs];setRulesets(updRs);await db.set('rulesets',updRs);const names=new Set(players.map(p=>p.name.toLowerCase()));const filtered=recentPlayers.filter(r=>!names.has(r.name.toLowerCase()));const newRecent=[...players.map(p=>({name:p.name,team:p.team,role:p.role})),...filtered].slice(0,30);setRecentPlayers(newRecent);await db.set('recent_players',newRecent);const hostInfo={hostName:meta.hostName,coHostName:meta.coHostName};setLastHostInfo(hostInfo);await db.set('host_info',hostInfo);setScreen('game');};
   const endSession=async()=>{if(session)await save({...session,endedAt:Date.now()});await db.del('session',true);setSession(null);setScreen('home');};
   if(screen==='loading')return<div style={{height:'100vh',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--red)',fontFamily:'var(--font-mono)',fontSize:13,letterSpacing:'0.2em',fontWeight:700}}>LOADING…</div>;
   if(screen==='home')return<HomeScreen session={session} onNew={()=>setScreen('setup')} onContinue={()=>setScreen('game')} onClear={endSession}/>;
-  if(screen==='setup')return<SetupScreen rulesets={rulesets} recentPlayers={recentPlayers} onComplete={startSession} onBack={()=>setScreen('home')}/>;
+  if(screen==='setup')return<SetupScreen rulesets={rulesets} recentPlayers={recentPlayers} lastHostInfo={lastHostInfo} onComplete={startSession} onBack={()=>setScreen('home')}/>;
   if(screen==='game'&&session)return<GameScreen session={session} onUpdate={save} onEndGame={endSession} onBack={()=>setScreen('home')} T={T}/>;
   return null;
 }
