@@ -372,7 +372,6 @@ button { font-family: var(--font); }
   max-width: 140px;
   max-height: 140px;
   object-fit: contain;
-  filter: drop-shadow(0 0 10px rgba(204,0,0,0.4));
 }
 .home__title {
   margin: 20px 0 4px;
@@ -381,11 +380,9 @@ button { font-family: var(--font); }
   letter-spacing: 0.06em;
   line-height: 1;
   font-family: var(--font-display);
-  background: linear-gradient(to right, var(--white) 50%, var(--red) 50%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
+.title-half--white { color: var(--white); }
+.title-half--red { color: var(--red); }
 .home__divider-row {
   display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px;
 }
@@ -514,8 +511,6 @@ button { font-family: var(--font); }
 .game__back { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 4px; }
 .game__logo {
   font-family: var(--font-display); font-size: 16px; letter-spacing: 0.12em; font-weight: 900;
-  background: linear-gradient(to right, var(--white) 50%, var(--red) 50%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 .game__cycle-wrap { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .game__cycle-badge {
@@ -724,3 +719,16 @@ button { font-family: var(--font); }
 .vote-weight-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 12px; }
 .vote-weight-row__label { font-size: 11px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .vote-weight-row__value { min-width: 24px; text-align: center; font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--red); }
+
+/* ============== REFERENCE (Maps & Items mini-db) ============== */
+.ref-entry {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: var(--r);
+  padding: 8px 10px;
+}
+.ref-entry--static { border-left-color: var(--border-bright); }
+.ref-entry__name { font-size: 13px; font-weight: 700; color: var(--text); }
+.ref-entry__desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; line-height: 1.4; }
