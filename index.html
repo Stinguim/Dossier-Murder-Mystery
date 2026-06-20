@@ -46,7 +46,7 @@ const db={
 
 // ═══ FACTORIES ═══
 const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
-const newRuleset=()=>({id:uid(),name:'My Rules',teams:['Mastermind','Despair','Student'],buffLibrary:[],gameNumbers:{investigationDuration:2,trialDuration:10,finalTrialDuration:5,rageDuration:3,autoVoteMultiplier:2}});
+const newRuleset=()=>({id:uid(),name:'My Rules',teams:['Mastermind','Despair','Student'],buffLibrary:[],mapLibrary:[],itemLibrary:[],gameNumbers:{investigationDuration:2,trialDuration:10,finalTrialDuration:5,rageDuration:3,autoVoteMultiplier:2}});
 const newSession=(rs,host,cohost,map)=>({id:uid(),rulesetSnapshot:{...rs},currentCycle:1,currentPhase:'Day',players:[],deaths:[],currentTrial:null,hostName:host||'',coHostName:cohost||'',mapName:map||'',startedAt:Date.now(),endedAt:null,winningTeam:null,lastModified:Date.now()});
 const newPlayer=(name,team,role)=>({id:uid(),name,team,role,alive:true,targetId:null,partnerId:null,effects:[],counters:{},notes:'',voteWeight:1});
 const newEffect=(name,type,appliedCycle,durationHours,permanent,description)=>{const cycles=permanent?null:Math.max(1,Math.round((+durationHours||12)/12));return{id:uid(),name,type,appliedCycle,durationCycles:cycles,expiresOnCycle:permanent?null:appliedCycle+cycles,permanent:!!permanent,manuallyExpired:false,description:description||''};};
@@ -200,7 +200,7 @@ function HomeScreen({session,onNew,onContinue,onClear}){
       <div className="home__header">
         <div className="home__eyebrow">◆ Murder Mystery VRChat ◆</div>
         <LogoImage variant="home"/>
-        <h1 className="home__title">DOSSIER</h1>
+        <h1 className="home__title"><span className="title-half--white">DOS</span><span className="title-half--red">SIER</span></h1>
         <div className="home__divider-row">
           <div className="home__divider-line"/>
           <div className="home__divider-text">HOST TERMINAL</div>
@@ -242,12 +242,20 @@ function SetupScreen({rulesets,recentPlayers,lastHostInfo,onComplete,onBack}){
   const[teamInput,setTeamInput]=useState(rulesets[0]?.teams.join(', ')||'');
   const[libOpen,setLibOpen]=useState(false);
   const[libForm,setLibForm]=useState({name:'',type:'buff',description:''});
+  const[refOpen,setRefOpen]=useState(false);
+  const[refTab,setRefTab]=useState('maps');
+  const[mapForm,setMapForm]=useState({name:'',notes:''});
+  const[itemForm,setItemForm]=useState({name:'',description:''});
   const[showRecent,setShowRecent]=useState(false);
   const teams=teamInput.split(',').map(t=>t.trim()).filter(Boolean);
   const addPlayer=()=>{if(!pForm.name.trim())return;setPlayers(p=>[...p,newPlayer(pForm.name.trim(),pForm.team||teams[0]||'',pForm.role.trim())]);setPForm(p=>({...p,name:'',role:''}));};
   const addRecentPlayer=rp=>{if(players.some(p=>p.name.toLowerCase()===rp.name.toLowerCase()))return;setPlayers(p=>[...p,newPlayer(rp.name,rp.team||teams[0]||'',rp.role||'')]);};
   const addToLib=()=>{if(!libForm.name.trim())return;const item={id:uid(),name:libForm.name.trim(),type:libForm.type,description:libForm.description.trim()};setRuleset(r=>({...r,buffLibrary:[...(r.buffLibrary||[]),item]}));setLibForm(f=>({name:'',type:f.type,description:''}));};
   const removeFromLib=id=>setRuleset(r=>({...r,buffLibrary:r.buffLibrary.filter(x=>x.id!==id)}));
+  const addMap=()=>{if(!mapForm.name.trim())return;const m={id:uid(),name:mapForm.name.trim(),notes:mapForm.notes.trim()};setRuleset(r=>({...r,mapLibrary:[...(r.mapLibrary||[]),m]}));setMapForm({name:'',notes:''});};
+  const removeMap=id=>setRuleset(r=>({...r,mapLibrary:r.mapLibrary.filter(x=>x.id!==id)}));
+  const addItem=()=>{if(!itemForm.name.trim())return;const it={id:uid(),name:itemForm.name.trim(),description:itemForm.description.trim()};setRuleset(r=>({...r,itemLibrary:[...(r.itemLibrary||[]),it]}));setItemForm({name:'',description:''});};
+  const removeItem=id=>setRuleset(r=>({...r,itemLibrary:r.itemLibrary.filter(x=>x.id!==id)}));
   const complete=()=>onComplete({...ruleset,teams},meta,players);
   const steps=['Session','Ruleset','Players'];
   // Auto-save ruleset edits (teams, game numbers, effect library) as the host types,
@@ -318,6 +326,59 @@ function SetupScreen({rulesets,recentPlayers,lastHostInfo,onComplete,onBack}){
                 </div>
               );})}
             </div>
+          </div>}
+          <Hr/>
+          <div onClick={()=>setRefOpen(s=>!s)} className="collapsible-header" style={{marginBottom:refOpen?10:0}}>
+            <Lbl style={{margin:0}}>Reference: Maps &amp; Items <span style={{color:'var(--text-muted)',textTransform:'none',fontWeight:400,letterSpacing:0}}>(optional)</span></Lbl>
+            <span style={{fontSize:11,color:'var(--text-dim)'}}>{(ruleset.mapLibrary||[]).length+(ruleset.itemLibrary||[]).length>0?`${(ruleset.mapLibrary||[]).length} map(s) · ${(ruleset.itemLibrary||[]).length} item(s)`:'empty'} {refOpen?'▲':'▼'}</span>
+          </div>
+          {refOpen&&<div>
+            <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:10}}>
+              Quick lookup for when a player asks "what does this do?" — accessible mid-game from the ⋮ menu.
+            </div>
+            <div className="report-tabs">
+              {[['maps','Maps'],['items','Items']].map(([k,l])=>(
+                <button key={k} onClick={()=>setRefTab(k)} className="report-tab" style={{'--tab-bg':refTab===k?'var(--red)':'var(--surface)','--tab-color':refTab===k?'#fff':'var(--text-dim)'}}>{l}</button>
+              ))}
+            </div>
+            {refTab==='maps'&&<>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',gap:7,marginBottom:8}}>
+                <Inp value={mapForm.name} onChange={v=>setMapForm(a=>({...a,name:v}))} placeholder="Map name"/>
+                <Inp value={mapForm.notes} onChange={v=>setMapForm(a=>({...a,notes:v}))} placeholder="Notes (spawns, special rules...)" onKeyDown={e=>e.key==='Enter'&&addMap()}/>
+                <Btn small variant="primary" onClick={addMap} disabled={!mapForm.name.trim()}>+</Btn>
+              </div>
+              {(ruleset.mapLibrary||[]).length===0&&<div style={{fontSize:11,color:'var(--text-muted)',fontStyle:'italic',marginBottom:4}}>No maps defined yet</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                {(ruleset.mapLibrary||[]).map(m=>(
+                  <div key={m.id} className="ref-entry">
+                    <div style={{flex:1}}>
+                      <div className="ref-entry__name">{m.name}</div>
+                      {m.notes&&<div className="ref-entry__desc">{m.notes}</div>}
+                    </div>
+                    <button onClick={()=>removeMap(m.id)} className="lib-chip__remove">✕</button>
+                  </div>
+                ))}
+              </div>
+            </>}
+            {refTab==='items'&&<>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',gap:7,marginBottom:8}}>
+                <Inp value={itemForm.name} onChange={v=>setItemForm(a=>({...a,name:v}))} placeholder="Item name"/>
+                <Inp value={itemForm.description} onChange={v=>setItemForm(a=>({...a,description:v}))} placeholder="What does it do?" onKeyDown={e=>e.key==='Enter'&&addItem()}/>
+                <Btn small variant="primary" onClick={addItem} disabled={!itemForm.name.trim()}>+</Btn>
+              </div>
+              {(ruleset.itemLibrary||[]).length===0&&<div style={{fontSize:11,color:'var(--text-muted)',fontStyle:'italic',marginBottom:4}}>No items defined yet</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                {(ruleset.itemLibrary||[]).map(it=>(
+                  <div key={it.id} className="ref-entry">
+                    <div style={{flex:1}}>
+                      <div className="ref-entry__name">{it.name}</div>
+                      {it.description&&<div className="ref-entry__desc">{it.description}</div>}
+                    </div>
+                    <button onClick={()=>removeItem(it.id)} className="lib-chip__remove">✕</button>
+                  </div>
+                ))}
+              </div>
+            </>}
           </div>}
         </>}
         {step===2&&<>
@@ -745,6 +806,52 @@ function AddPlayerModal({teams,onAdd,onClose}){
 }
 
 // ═══ REPORTS MODAL ═══
+// ═══ REFERENCE MODAL — quick lookup for maps & items mid-game ═══
+function ReferenceModal({session,onClose}){
+  const[tab,setTab]=useState('maps');
+  const[query,setQuery]=useState('');
+  const rs=session.rulesetSnapshot;
+  const maps=rs.mapLibrary||[];
+  const items=rs.itemLibrary||[];
+  const q=query.trim().toLowerCase();
+  const filteredMaps=q?maps.filter(m=>m.name.toLowerCase().includes(q)||m.notes.toLowerCase().includes(q)):maps;
+  const filteredItems=q?items.filter(it=>it.name.toLowerCase().includes(q)||it.description.toLowerCase().includes(q)):items;
+  const list=tab==='maps'?filteredMaps:filteredItems;
+  const empty=tab==='maps'?maps.length===0:items.length===0;
+  return(
+    <Modal title="📖 Reference" onClose={onClose} wide>
+      <div className="report-tabs">
+        {[['maps',`Maps (${maps.length})`],['items',`Items (${items.length})`]].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} className="report-tab" style={{'--tab-bg':tab===k?'var(--red)':'var(--surface)','--tab-color':tab===k?'#fff':'var(--text-dim)'}}>{l}</button>
+        ))}
+      </div>
+      <Inp value={query} onChange={setQuery} placeholder={`Search ${tab}...`} style={{marginBottom:12}}/>
+      {empty&&<div style={{fontSize:12,color:'var(--text-muted)',fontStyle:'italic',textAlign:'center',padding:20}}>
+        Nothing defined yet — add {tab} from the Ruleset step next time you set up a session.
+      </div>}
+      {!empty&&list.length===0&&<div style={{fontSize:12,color:'var(--text-muted)',textAlign:'center',padding:20}}>No match for "{query}"</div>}
+      <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:'56vh',overflow:'auto'}}>
+        {tab==='maps'&&filteredMaps.map(m=>(
+          <div key={m.id} className="ref-entry ref-entry--static">
+            <div style={{flex:1}}>
+              <div className="ref-entry__name">{m.name}</div>
+              {m.notes&&<div className="ref-entry__desc">{m.notes}</div>}
+            </div>
+          </div>
+        ))}
+        {tab==='items'&&filteredItems.map(it=>(
+          <div key={it.id} className="ref-entry ref-entry--static">
+            <div style={{flex:1}}>
+              <div className="ref-entry__name">{it.name}</div>
+              {it.description&&<div className="ref-entry__desc">{it.description}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 function ReportsModal({session,onClose}){
   const[tab,setTab]=useState('results');
   const[highlights,setHighlights]=useState('');
@@ -814,7 +921,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack}){
       <div className="game__header">
         <button onClick={onBack} className="game__back">←</button>
         <LogoImage variant="header"/>
-        <div className="game__logo">DOSSIER</div>
+        <div className="game__logo"><span className="title-half--white">DOS</span><span className="title-half--red">SIER</span></div>
         <div className="game__cycle-wrap">
           <span className="game__cycle-badge" style={{'--cycle-bg':isDay?'transparent':'var(--red)','--cycle-border':isDay?'var(--white)':'var(--red)'}}>
             {isDay?'☀':'☾'} {isDay?'DAY':'NIGHT'} {dayNumber}
@@ -874,6 +981,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack}){
         <div className="dropdown">
           <MBtn onClick={()=>{setModal({type:'addPlayer'});setShowMenu(false);}}>Add Player</MBtn>
           <MBtn onClick={()=>{setModal({type:'reports'});setShowMenu(false);}}>Reports</MBtn>
+          <MBtn onClick={()=>{setModal({type:'reference'});setShowMenu(false);}}>📖 Reference</MBtn>
           {session.currentTrial&&<MBtn onClick={()=>{dismissTrial();setShowMenu(false);}}>Dismiss Active Trial</MBtn>}
           <div className="hr" style={{margin:'4px 8px'}}/>
           {!confirmEnd?<MBtn danger onClick={e=>{e.stopPropagation();setConfirmEnd(true);}}>End Game</MBtn>:(
@@ -892,6 +1000,7 @@ function GameScreen({session,onUpdate,onEndGame,onBack}){
       {modal?.type==='trial'&&<TrialModal session={session} onUpdate={updateTrial} onClose={closeTrial}/>}
       {modal?.type==='addPlayer'&&<AddPlayerModal teams={rs.teams} onAdd={p=>{onUpdate({...session,players:[...session.players,p]});setModal(null);}} onClose={()=>setModal(null)}/>}
       {modal?.type==='reports'&&<ReportsModal session={session} onClose={()=>setModal(null)}/>}
+      {modal?.type==='reference'&&<ReferenceModal session={session} onClose={()=>setModal(null)}/>}
     </div>
   );
 }
